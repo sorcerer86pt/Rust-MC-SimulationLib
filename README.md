@@ -32,10 +32,12 @@ project's paper).
 | Module | What it does |
 |---|---|
 | [`rust_mc_sim::svd`] | Truncated SVD via faer + a cache-friendly `SvdKernel` with optional log-uniform hash index |
+| [`rust_mc_sim::table`] | Production-baseline pointwise table with log-log interpolation; OpenMC-style stochastic temperature pseudo-interpolation. The right pick when you want byte-exact values at grid points |
 | [`rust_mc_sim::cp`] | CP/PARAFAC decomposition of a 3-tensor (greedy rank-1 deflation) |
 | [`rust_mc_sim::ducru`] | Ducru-2017 free-Doppler reconstruction weights, raw and partition-of-unity |
 | [`rust_mc_sim::cdf`] | Log-decimated CDF for inverse-transform sampling of categorical outcomes that depend on a continuous coordinate |
 | [`rust_mc_sim::rng`] | PCG-64 RNG used by `cdf` sampling and the nuclear layer |
+| [`rust_mc_sim::batch`] | Sequential and rayon-parallel batch APIs for at-scale loads (200k-nuclide depletion-style libraries) |
 
 ### Nuclear-data layer (`feature = "nuclear"`, adds [`hdf5-pure`])
 
@@ -53,6 +55,37 @@ project's paper).
 rust-mc-sim = "0.1"
 # or, with the nuclear-data layer:
 # rust-mc-sim = { version = "0.1", features = ["nuclear"] }
+```
+
+### Pointwise table — the production baseline
+
+```rust
+use rust_mc_sim::PointwiseTable;
+
+let xs = vec![1.0, 10.0, 100.0, 1000.0];
+let vs = vec![2.0, 4.0, 8.0, 16.0];
+let mut t = PointwiseTable::new(xs, vs);
+t.build_hash(8192);              // O(1) lookup once built
+assert!((t.lookup(50.0) - 6.5).abs() < 0.5);
+```
+
+For OpenMC-style stochastic temperature pseudo-interpolation:
+
+```rust,ignore
+use rust_mc_sim::{PointwiseTable, StochTempTable};
+
+let lo = PointwiseTable::new(/* T=600 K */);
+let hi = PointwiseTable::new(/* T=900 K */);
+let stoch = StochTempTable::stochastic(lo, hi, 750.0, 600.0, 900.0);
+
+// Single-channel lookup with internal pick:
+let v = stoch.lookup(some_x);
+
+// Multi-channel: draw one pick per physics event, share across channels:
+let pick = stoch_elastic.draw_pick();
+let el = stoch_elastic.lookup_at_idx_with_pick(x, idx, pick);
+let cap = stoch_capture.lookup_at_idx_with_pick(x, idx, pick);
+let fis = stoch_fission.lookup_at_idx_with_pick(x, idx, pick);
 ```
 
 ### Truncated SVD with off-column reconstruction

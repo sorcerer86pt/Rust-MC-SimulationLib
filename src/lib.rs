@@ -13,6 +13,10 @@
 //!
 //! * [`svd`] — truncated SVD via faer + cache-friendly
 //!   reconstruction kernel with optional log-uniform hash index.
+//! * [`table`] — production-baseline pointwise table with log-log
+//!   interpolation and OpenMC-style stochastic temperature
+//!   pseudo-interpolation. The right pick when you want byte-exact
+//!   values at grid points (no SVD reconstruction error).
 //! * [`cp`] — CP / PARAFAC decomposition of a 3-tensor (greedy
 //!   rank-1 deflation).
 //! * [`ducru`] — Ducru-2017 free-Doppler weights for off-grid
@@ -23,6 +27,9 @@
 //! * [`rng`] — PCG-64 RNG used by [`cdf`] sampling and the
 //!   nuclear-data layer; exposed so callers can plug their own
 //!   reproducible streams in.
+//! * [`batch`] — sequential and (with `feature = "parallel"`) rayon
+//!   batch APIs for at-scale loads (200k-nuclide depletion-style
+//!   libraries, large CP-decomposition sweeps).
 //!
 //! Nuclear-data layer (`feature = "nuclear"`, pulls in `hdf5-pure`):
 //!
@@ -47,6 +54,7 @@ pub mod ducru;
 pub mod error;
 pub mod rng;
 pub mod svd;
+pub mod table;
 
 #[cfg(feature = "nuclear")]
 pub mod nuclear {
@@ -84,3 +92,4 @@ pub use cp::{CpDecomposition, cp_greedy_rank1, max_abs_error, relative_l2_error}
 pub use ducru::{ducru_unity_weights, ducru_weights, nearest_k_columns};
 pub use rng::Pcg64;
 pub use svd::{LogHashIndex, Svd, SvdKernel};
+pub use table::{PointwiseTable, StochTempTable};
