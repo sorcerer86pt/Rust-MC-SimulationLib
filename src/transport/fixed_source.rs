@@ -15,6 +15,7 @@
 //! [`crate::tally::FluxTally`] (or other scorer) the caller passes
 //! in; this module's job is just the transport.
 
+use crate::geometry::bvh::Bvh;
 use crate::geometry::surface::BoundaryCondition;
 use crate::geometry::{Cell, Surface, Vec3, ray};
 use crate::rng::Pcg64;
@@ -147,6 +148,7 @@ pub fn run_fixed_source<S: NeutronSource>(
     tally: Option<&mut FluxTally>,
 ) -> FixedSourceResult {
     let mut rng = Pcg64::new(cfg.seed, 1);
+    let bvh = Bvh::build(cells);
     let mut batches = Vec::with_capacity(cfg.n_batches as usize);
     let mut tally_box = tally;
 
@@ -158,13 +160,15 @@ pub fn run_fixed_source<S: NeutronSource>(
 
         for _ in 0..cfg.n_particles_per_batch {
             let s = source.sample(&mut rng);
-            let cell_idx = ray::find_cell(s.pos, surfaces, cells).unwrap_or(0);
+            let cell_idx =
+                ray::find_cell_bvh(s.pos, surfaces, cells, &bvh).unwrap_or(0);
             let mut p = Particle::new(s.pos, s.dir, s.energy, cell_idx);
             p.weight = s.weight;
             transport_one(
                 &mut p,
                 cells,
                 surfaces,
+                &bvh,
                 &cell_material,
                 materials,
                 &mut rng,
@@ -200,6 +204,7 @@ fn transport_one(
     p: &mut Particle,
     cells: &[Cell],
     surfaces: &[Surface],
+    bvh: &Bvh,
     cell_material: &impl Fn(usize) -> usize,
     materials: &[Material],
     rng: &mut Pcg64,
@@ -214,7 +219,7 @@ fn transport_one(
         let material = &materials[mat_idx];
         let sigma_t = material.macro_total(p.energy).max(1e-30);
         let dist_collision = -rng.uniform().ln() / sigma_t;
-        let trace = ray::trace_step(p.pos, p.dir, p.cell_idx, surfaces, cells);
+        let trace = ray::trace_step_opt(p.pos, p.dir, p.cell_idx, surfaces, cells, Some(bvh));
         let dist_surface = trace.as_ref().map_or(f64::INFINITY, |h| h.distance);
 
         if dist_collision < dist_surface {
@@ -262,12 +267,12 @@ fn transport_one(
                     );
                     p.advance(2e-10);
                     p.status = ParticleStatus::Alive;
-                    if let Some(c) = ray::find_cell(p.pos, surfaces, cells) {
+                    if let Some(c) = ray::find_cell_bvh(p.pos, surfaces, cells, bvh) {
                         p.cell_idx = c;
                     }
                 }
                 BoundaryCondition::Transmission => {
-                    if let Some(c) = ray::find_cell(p.pos, surfaces, cells) {
+                    if let Some(c) = ray::find_cell_bvh(p.pos, surfaces, cells, bvh) {
                         p.cell_idx = c;
                     } else {
                         *n_leaked += 1;

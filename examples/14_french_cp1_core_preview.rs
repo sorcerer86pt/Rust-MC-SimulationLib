@@ -100,46 +100,56 @@ fn main() {
             assembly_count += 1;
             let mat = classify_assembly(i, j, r);
             let s = push(&mut surfaces, cyl(cx, cy, ASSEMBLY_RADIUS));
-            cells.push(Cell::new(
-                CellId(cells.len() as u32),
-                inside(s),
-                CellFill::Material(mat as u32),
-            ));
+            cells.push(
+                Cell::new(
+                    CellId(cells.len() as u32),
+                    inside(s),
+                    CellFill::Material(mat as u32),
+                )
+                .with_aabb_from_region(&surfaces),
+            );
             cell_materials.push(mat);
         }
     }
 
-    // Water inside core barrel; assemblies (defined earlier) shadow
-    // this cell wherever they cover.
-    cells.push(Cell::new(
-        CellId(cells.len() as u32),
-        inside(s_barrel_inner),
-        CellFill::Material(MAT_WATER as u32),
-    ));
+    cells.push(
+        Cell::new(
+            CellId(cells.len() as u32),
+            inside(s_barrel_inner),
+            CellFill::Material(MAT_WATER as u32),
+        )
+        .with_aabb_from_region(&surfaces),
+    );
     cell_materials.push(MAT_WATER);
 
-    // Steel barrel.
-    cells.push(Cell::new(
-        CellId(cells.len() as u32),
-        between(s_barrel_inner, s_barrel_outer),
-        CellFill::Material(MAT_STEEL as u32),
-    ));
+    cells.push(
+        Cell::new(
+            CellId(cells.len() as u32),
+            between(s_barrel_inner, s_barrel_outer),
+            CellFill::Material(MAT_STEEL as u32),
+        )
+        .with_aabb_from_region(&surfaces),
+    );
     cell_materials.push(MAT_STEEL);
 
-    // Water reflector annulus.
-    cells.push(Cell::new(
-        CellId(cells.len() as u32),
-        between(s_barrel_outer, s_reflector_outer),
-        CellFill::Material(MAT_WATER as u32),
-    ));
+    cells.push(
+        Cell::new(
+            CellId(cells.len() as u32),
+            between(s_barrel_outer, s_reflector_outer),
+            CellFill::Material(MAT_WATER as u32),
+        )
+        .with_aabb_from_region(&surfaces),
+    );
     cell_materials.push(MAT_WATER);
 
-    // Pressure vessel.
-    cells.push(Cell::new(
-        CellId(cells.len() as u32),
-        between(s_reflector_outer, s_vessel_outer),
-        CellFill::Material(MAT_STEEL as u32),
-    ));
+    cells.push(
+        Cell::new(
+            CellId(cells.len() as u32),
+            between(s_reflector_outer, s_vessel_outer),
+            CellFill::Material(MAT_STEEL as u32),
+        )
+        .with_aabb_from_region(&surfaces),
+    );
     cell_materials.push(MAT_STEEL);
 
     let viewport = Viewport::square_centered(VESSEL_OUTER * 1.25, 0.0, 1000);

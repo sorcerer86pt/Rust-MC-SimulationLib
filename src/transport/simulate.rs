@@ -9,6 +9,7 @@
 //! conditions are read from each [`crate::geometry::Surface`]'s
 //! [`crate::geometry::surface::BoundaryCondition`].
 
+use crate::geometry::bvh::Bvh;
 use crate::geometry::surface::BoundaryCondition;
 use crate::geometry::{ray, Cell, Surface, Vec3};
 use crate::rng::Pcg64;
@@ -71,10 +72,16 @@ pub fn run_eigenvalue(
     source_energy_ev: f64,
 ) -> EigenvalueResult {
     let mut rng = Pcg64::new(cfg.seed, 1);
+    // Build the BVH once; every cell-finding call below uses it. For
+    // single-pin or critical-sphere geometries the speedup is small;
+    // for assembly- or core-scale geometries with thousands of cells
+    // it's the difference between minutes and seconds per batch.
+    let bvh = Bvh::build(cells);
     let mut source = build_initial_source(
         cfg.n_particles_per_batch as usize,
         cells,
         surfaces,
+        &bvh,
         source_box,
         source_energy_ev,
         &mut rng,
@@ -96,12 +103,14 @@ pub fn run_eigenvalue(
             weight_in += site.weight;
             let (u, v, w) = rng.isotropic_direction();
             let initial_dir = Vec3::new(u, v, w);
-            let cell_idx = ray::find_cell(site.pos, surfaces, cells).unwrap_or(0);
+            let cell_idx =
+                ray::find_cell_bvh(site.pos, surfaces, cells, &bvh).unwrap_or(0);
             let mut p = Particle::new(site.pos, initial_dir, site.energy, cell_idx);
             transport_one(
                 &mut p,
                 cells,
                 surfaces,
+                &bvh,
                 &cell_material,
                 materials,
                 &mut rng,
@@ -181,6 +190,7 @@ fn transport_one(
     p: &mut Particle,
     cells: &[Cell],
     surfaces: &[Surface],
+    bvh: &Bvh,
     cell_material: &impl Fn(usize) -> usize,
     materials: &[Material],
     rng: &mut Pcg64,
@@ -195,7 +205,7 @@ fn transport_one(
         let material = &materials[mat_idx];
         let sigma_t = material.macro_total(p.energy).max(1e-30);
         let dist_collision = -rng.uniform().ln() / sigma_t;
-        let trace = ray::trace_step(p.pos, p.dir, p.cell_idx, surfaces, cells);
+        let trace = ray::trace_step_opt(p.pos, p.dir, p.cell_idx, surfaces, cells, Some(bvh));
         let dist_surface = trace.as_ref().map_or(f64::INFINITY, |h| h.distance);
 
         if dist_collision < dist_surface {
@@ -218,6 +228,7 @@ fn transport_one(
                             &mut sec_p,
                             cells,
                             surfaces,
+                            bvh,
                             cell_material,
                             materials,
                             rng,
@@ -251,12 +262,12 @@ fn transport_one(
                     // Step a little so we're inside the new cell.
                     p.advance(2e-10);
                     p.status = ParticleStatus::Alive;
-                    if let Some(c) = ray::find_cell(p.pos, surfaces, cells) {
+                    if let Some(c) = ray::find_cell_bvh(p.pos, surfaces, cells, bvh) {
                         p.cell_idx = c;
                     }
                 }
                 BoundaryCondition::Transmission => {
-                    if let Some(c) = ray::find_cell(p.pos, surfaces, cells) {
+                    if let Some(c) = ray::find_cell_bvh(p.pos, surfaces, cells, bvh) {
                         p.cell_idx = c;
                     } else {
                         // Outside geometry — vacuum semantics.
@@ -278,6 +289,7 @@ fn transport_secondary(
     p: &mut Particle,
     cells: &[Cell],
     surfaces: &[Surface],
+    bvh: &Bvh,
     cell_material: &impl Fn(usize) -> usize,
     materials: &[Material],
     rng: &mut Pcg64,
@@ -292,7 +304,7 @@ fn transport_secondary(
         let material = &materials[mat_idx];
         let sigma_t = material.macro_total(p.energy).max(1e-30);
         let dist_collision = -rng.uniform().ln() / sigma_t;
-        let trace = ray::trace_step(p.pos, p.dir, p.cell_idx, surfaces, cells);
+        let trace = ray::trace_step_opt(p.pos, p.dir, p.cell_idx, surfaces, cells, Some(bvh));
         let dist_surface = trace.as_ref().map_or(f64::INFINITY, |h| h.distance);
         if dist_collision < dist_surface {
             p.advance(dist_collision);
@@ -330,12 +342,12 @@ fn transport_secondary(
                     );
                     p.advance(2e-10);
                     p.status = ParticleStatus::Alive;
-                    if let Some(c) = ray::find_cell(p.pos, surfaces, cells) {
+                    if let Some(c) = ray::find_cell_bvh(p.pos, surfaces, cells, bvh) {
                         p.cell_idx = c;
                     }
                 }
                 BoundaryCondition::Transmission => {
-                    if let Some(c) = ray::find_cell(p.pos, surfaces, cells) {
+                    if let Some(c) = ray::find_cell_bvh(p.pos, surfaces, cells, bvh) {
                         p.cell_idx = c;
                     } else {
                         *n_leaked += 1;
@@ -354,6 +366,7 @@ fn build_initial_source(
     n: usize,
     cells: &[Cell],
     surfaces: &[Surface],
+    bvh: &Bvh,
     source_box: ([f64; 3], [f64; 3]),
     energy: f64,
     rng: &mut Pcg64,
@@ -366,7 +379,7 @@ fn build_initial_source(
         let y = ymin + rng.uniform() * (ymax - ymin);
         let z = zmin + rng.uniform() * (zmax - zmin);
         let pos = Vec3::new(x, y, z);
-        if ray::find_cell(pos, surfaces, cells).is_some() {
+        if ray::find_cell_bvh(pos, surfaces, cells, bvh).is_some() {
             sites.push(FissionSite {
                 pos,
                 energy,

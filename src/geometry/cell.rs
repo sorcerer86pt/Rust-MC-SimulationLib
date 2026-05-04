@@ -8,7 +8,7 @@
 //!
 //! This is stored as an algebraic data type (enum), not a class hierarchy.
 
-use super::Aabb;
+use super::{Aabb, Surface};
 
 /// Unique identifier for a cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -62,6 +62,38 @@ impl Region {
         }
     }
 
+    /// Tight-ish AABB of the points that satisfy this region.
+    ///
+    /// Half-spaces of *bounded* surfaces (sphere, cylinder) shrink the
+    /// AABB on their bounded axes when used as `inside(s)`; half-spaces
+    /// used as `outside(s)` impose no AABB constraint (they leave the
+    /// AABB infinite on their bounded axes). `Intersection` clips,
+    /// `Union` enlarges, `Complement` falls back to infinite. The
+    /// result is correct (no point inside the region falls outside the
+    /// returned AABB) but not always tight (e.g. an annulus from
+    /// `between(s_inner, s_outer)` returns `s_outer`'s AABB; the inner
+    /// hole isn't punched out).
+    pub fn aabb(&self, surfaces: &[Surface]) -> Aabb {
+        match self {
+            Self::HalfSpace {
+                surface_idx,
+                positive,
+            } => {
+                if *positive {
+                    // `outside(s)` — the +half-space of a bounded
+                    // surface still extends to infinity in every
+                    // direction. No AABB constraint.
+                    Aabb::INFINITE
+                } else {
+                    surfaces[*surface_idx].aabb()
+                }
+            }
+            Self::Intersection(a, b) => a.aabb(surfaces).intersection(b.aabb(surfaces)),
+            Self::Union(a, b) => a.aabb(surfaces).union(b.aabb(surfaces)),
+            Self::Complement(_) => Aabb::INFINITE,
+        }
+    }
+
     /// Collect all surface indices referenced by this region.
     pub fn surface_indices(&self, out: &mut Vec<usize>) {
         match self {
@@ -108,6 +140,14 @@ impl Cell {
     /// Set the bounding box.
     pub fn with_aabb(mut self, aabb: Aabb) -> Self {
         self.aabb = aabb;
+        self
+    }
+
+    /// Compute and set the bounding box automatically by walking the
+    /// cell's region against `surfaces`. Equivalent to
+    /// `cell.with_aabb(cell.region.aabb(surfaces))` but reads better.
+    pub fn with_aabb_from_region(mut self, surfaces: &[Surface]) -> Self {
+        self.aabb = self.region.aabb(surfaces);
         self
     }
 

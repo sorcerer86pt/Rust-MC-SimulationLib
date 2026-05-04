@@ -4,6 +4,7 @@
 //! position and direction, find how far it can travel before hitting
 //! a surface, and which cell it enters on the other side.
 
+use super::bvh::Bvh;
 use super::{Cell, Surface, Vec3};
 
 /// A ray: position + direction.
@@ -67,16 +68,13 @@ pub fn find_nearest_surface(
 
 /// Find which cell contains a given point.
 ///
-/// Evaluates all surfaces once, then tests each cell's boolean region.
-/// The BVH accelerates this by skipping cells whose AABB doesn't
-/// contain the point.
+/// Linear AABB-rejected scan over all cells. Use [`find_cell_bvh`]
+/// for the BVH-accelerated path; production drivers (eigenvalue,
+/// fixed-source, photon transport, preview render) build a BVH once
+/// and call that.
 pub fn find_cell(pos: Vec3, surfaces: &[Surface], cells: &[Cell]) -> Option<usize> {
-    // Pre-evaluate all surfaces at this point
     let evals: Vec<f64> = surfaces.iter().map(|s| s.evaluate(pos)).collect();
-
-    // Test each cell
     for (idx, cell) in cells.iter().enumerate() {
-        // Quick AABB rejection
         if !cell.aabb.contains(pos) {
             continue;
         }
@@ -84,8 +82,37 @@ pub fn find_cell(pos: Vec3, surfaces: &[Surface], cells: &[Cell]) -> Option<usiz
             return Some(idx);
         }
     }
-
     None
+}
+
+/// BVH-accelerated cell lookup. Equivalent semantics to
+/// [`find_cell`] but skips whole subtrees whose AABB doesn't contain
+/// `pos`. Bottleneck cost on large geometries (≥ a few hundred
+/// cells) drops from O(N) cell tests to O(log N + leaves-overlapping-pos).
+#[inline]
+pub fn find_cell_bvh(
+    pos: Vec3,
+    surfaces: &[Surface],
+    cells: &[Cell],
+    bvh: &Bvh,
+) -> Option<usize> {
+    bvh.find_cell(pos, surfaces, cells)
+}
+
+/// Lookup that uses `bvh` when supplied, falling back to the linear
+/// scan otherwise. Convenience for transport drivers that want to
+/// stay generic over "BVH built or not".
+#[inline]
+pub fn find_cell_opt(
+    pos: Vec3,
+    surfaces: &[Surface],
+    cells: &[Cell],
+    bvh: Option<&Bvh>,
+) -> Option<usize> {
+    match bvh {
+        Some(b) => find_cell_bvh(pos, surfaces, cells, b),
+        None => find_cell(pos, surfaces, cells),
+    }
 }
 
 /// Full ray trace step: find distance to nearest surface and next cell.
@@ -101,22 +128,29 @@ pub fn trace_step(
     surfaces: &[Surface],
     cells: &[Cell],
 ) -> Option<RayHit> {
-    // Get the surfaces bounding the current cell
+    trace_step_opt(pos, dir, current_cell_idx, surfaces, cells, None)
+}
+
+/// BVH-aware variant of [`trace_step`]. The BVH is used only for the
+/// next-cell lookup after the surface crossing; the surface-distance
+/// loop stays scoped to the current cell's surface set, which is
+/// already small.
+pub fn trace_step_opt(
+    pos: Vec3,
+    dir: Vec3,
+    current_cell_idx: usize,
+    surfaces: &[Surface],
+    cells: &[Cell],
+    bvh: Option<&Bvh>,
+) -> Option<RayHit> {
     let cell = &cells[current_cell_idx];
     let mut surface_indices = Vec::new();
     cell.region.surface_indices(&mut surface_indices);
     surface_indices.sort_unstable();
     surface_indices.dedup();
-
-    // Find nearest surface
     let mut hit = find_nearest_surface(pos, dir, surfaces, &surface_indices)?;
-
-    // Move to the crossing point (with a small nudge across)
     let cross_point = pos + dir * (hit.distance + 1e-10);
-
-    // Find the cell on the other side
-    hit.next_cell_idx = find_cell(cross_point, surfaces, cells);
-
+    hit.next_cell_idx = find_cell_opt(cross_point, surfaces, cells, bvh);
     Some(hit)
 }
 

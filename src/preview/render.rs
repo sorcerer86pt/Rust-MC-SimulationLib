@@ -1,3 +1,4 @@
+use crate::geometry::bvh::Bvh;
 use crate::geometry::{Cell, Surface, Vec3, ray};
 
 /// Anything that carries a human-readable material name. Implemented
@@ -277,6 +278,11 @@ pub fn render_top_down(
     palette: &MaterialPalette,
     viewport: &Viewport,
 ) -> Vec<u32> {
+    // Build a BVH once per render. Per-pixel cell-finding goes from
+    // O(N) to O(log N + leaves-overlapping-pos) — for assembly- or
+    // core-scale geometries this is the difference between a slow
+    // tens-of-seconds render and a fast sub-second one.
+    let bvh = Bvh::build(cells);
     let w = viewport.width as usize;
     let h = viewport.height as usize;
     let dx = (viewport.x_max - viewport.x_min) / viewport.width as f64;
@@ -284,12 +290,11 @@ pub fn render_top_down(
     let mut buf = vec![0u32; w * h];
 
     for py in 0..viewport.height {
-        // Image y goes top-down; world y goes bottom-up.
         let world_y = viewport.y_max - (py as f64 + 0.5) * dy;
         for px in 0..viewport.width {
             let world_x = viewport.x_min + (px as f64 + 0.5) * dx;
             let pos = Vec3::new(world_x, world_y, viewport.z_slice);
-            let color = match ray::find_cell(pos, surfaces, cells) {
+            let color = match ray::find_cell_bvh(pos, surfaces, cells, &bvh) {
                 Some(idx) => {
                     let mat = cell_to_material(idx);
                     palette.colors.get(mat).copied().unwrap_or(palette.void)
@@ -368,6 +373,63 @@ mod tests {
         );
         approx_color(auto_color_from_name("lead shielding"), [70, 70, 90]);
         approx_color(auto_color_from_name("Pb-Bi eutectic"), [60, 80, 100]);
+    }
+
+    #[test]
+    fn render_top_down_paints_cells_via_bvh() {
+        // Concentric pin + water cell, both with infinite-Z AABBs.
+        // Verify that the BVH-accelerated render produces non-void
+        // pixels for both materials (i.e. the BVH actually finds
+        // them, no black screen).
+        use crate::geometry::cell::{Cell, CellFill, CellId, between, inside};
+        use crate::geometry::surface::BoundaryCondition;
+        use crate::geometry::Surface;
+        use crate::transport::material::Material;
+
+        let materials = vec![
+            Material::new("UO2 fuel (fresh)", 900.0),
+            Material::new("light water", 583.0),
+        ];
+        let surfaces = vec![
+            Surface::CylinderZ {
+                center_x: 0.0,
+                center_y: 0.0,
+                radius: 5.0,
+                bc: BoundaryCondition::Transmission,
+            },
+            Surface::CylinderZ {
+                center_x: 0.0,
+                center_y: 0.0,
+                radius: 10.0,
+                bc: BoundaryCondition::Transmission,
+            },
+        ];
+        let cells = vec![
+            Cell::new(CellId(0), inside(0), CellFill::Material(0))
+                .with_aabb_from_region(&surfaces),
+            Cell::new(CellId(1), between(0, 1), CellFill::Material(1))
+                .with_aabb_from_region(&surfaces),
+        ];
+        let cell_materials = vec![0_usize, 1];
+        let palette = MaterialPalette::for_materials(&materials);
+        let viewport = Viewport::square_centered(12.0, 0.0, 100);
+        let buf =
+            render_top_down(&cells, &surfaces, |i| cell_materials[i], &palette, &viewport);
+
+        let void = pack_rgb(palette.void);
+        let n_void = buf.iter().filter(|&&c| c == void).count();
+        let n_filled = buf.len() - n_void;
+        assert!(
+            n_filled > buf.len() / 4,
+            "expected the cell pair to fill > 25 % of the viewport, got {}/{}",
+            n_filled,
+            buf.len()
+        );
+        // Both materials should appear.
+        let red = pack_rgb([200, 80, 60]);
+        let blue = pack_rgb([80, 150, 230]);
+        assert!(buf.iter().any(|&c| c == red), "no fuel pixels found");
+        assert!(buf.iter().any(|&c| c == blue), "no water pixels found");
     }
 
     #[test]

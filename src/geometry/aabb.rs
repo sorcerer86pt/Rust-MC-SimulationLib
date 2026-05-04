@@ -35,6 +35,17 @@ impl Aabb {
         }
     }
 
+    /// AABB of the geometric intersection of two AABBs. May produce
+    /// an empty box (`min > max` on one or more axes) when the
+    /// inputs don't overlap; callers that care should treat that as
+    /// "the point can't be inside both regions".
+    pub fn intersection(self, other: Self) -> Self {
+        Self {
+            min: self.min.component_max(other.min),
+            max: self.max.component_min(other.max),
+        }
+    }
+
     /// Test if a point is inside the AABB.
     #[inline]
     pub fn contains(&self, p: Vec3) -> bool {

@@ -32,12 +32,21 @@ impl Bvh {
             return Self { root: None };
         }
 
-        // Collect (cell_index, aabb, centroid) for cells with finite AABBs
+        // We accept cells with infinite-axis AABBs (e.g. CylinderZ
+        // is infinite in z) — the splitter picks the largest *finite*
+        // axis so infinite axes don't poison the partition.
         let mut entries: Vec<(usize, Aabb, Vec3)> = cells
             .iter()
             .enumerate()
-            .filter(|(_, c)| c.aabb.surface_area().is_finite())
-            .map(|(i, c)| (i, c.aabb, c.aabb.center()))
+            .map(|(i, c)| {
+                let aabb = c.aabb;
+                // Centroid: substitute 0 on infinite axes so sort
+                // ordering is well-defined.
+                let cx = if aabb.center().x.is_finite() { aabb.center().x } else { 0.0 };
+                let cy = if aabb.center().y.is_finite() { aabb.center().y } else { 0.0 };
+                let cz = if aabb.center().z.is_finite() { aabb.center().z } else { 0.0 };
+                (i, aabb, Vec3::new(cx, cy, cz))
+            })
             .collect();
 
         if entries.is_empty() {
@@ -49,10 +58,19 @@ impl Bvh {
     }
 
     /// Find which cell contains a point, using BVH acceleration.
+    ///
+    /// Semantics match the linear scan in [`crate::geometry::ray::find_cell`]:
+    /// when several cells' regions all match `pos`, the one with the
+    /// *lowest* index in `cells` wins. This is needed so OpenMC-style
+    /// lazy geometries — e.g. "water = inside the core barrel" with
+    /// assembly cells listed earlier in the cells vec to shadow it —
+    /// render and transport identically with or without the BVH.
     pub fn find_cell(&self, pos: Vec3, surfaces: &[Surface], cells: &[Cell]) -> Option<usize> {
         let root = self.root.as_ref()?;
         let evals: Vec<f64> = surfaces.iter().map(|s| s.evaluate(pos)).collect();
-        find_cell_recursive(root, pos, &evals, cells)
+        let mut best: Option<usize> = None;
+        find_cell_recursive(root, pos, &evals, cells, &mut best);
+        best
     }
 }
 
@@ -61,21 +79,30 @@ fn find_cell_recursive(
     pos: Vec3,
     surface_evals: &[f64],
     cells: &[Cell],
-) -> Option<usize> {
+    best: &mut Option<usize>,
+) {
     match node {
         BvhNode::Leaf { cell_idx, aabb } => {
+            // Skip if a smaller index has already matched — the
+            // answer can't change.
+            if let Some(b) = *best
+                && *cell_idx >= b
+            {
+                return;
+            }
             if aabb.contains(pos) && cells[*cell_idx].contains(surface_evals) {
-                Some(*cell_idx)
-            } else {
-                None
+                *best = Some(match *best {
+                    Some(b) => b.min(*cell_idx),
+                    None => *cell_idx,
+                });
             }
         }
         BvhNode::Internal { aabb, left, right } => {
             if !aabb.contains(pos) {
-                return None;
+                return;
             }
-            find_cell_recursive(left, pos, surface_evals, cells)
-                .or_else(|| find_cell_recursive(right, pos, surface_evals, cells))
+            find_cell_recursive(left, pos, surface_evals, cells, best);
+            find_cell_recursive(right, pos, surface_evals, cells, best);
         }
     }
 }
@@ -110,11 +137,17 @@ fn build_recursive(entries: &mut [(usize, Aabb, Vec3)]) -> BvhNode {
         };
     }
 
-    // Find the axis with the largest extent
+    // Largest *finite* axis — infinite axes (e.g. cylinder z) shouldn't
+    // dictate the split because every entry shares the same infinite
+    // extent and sorting collapses.
     let extent = overall_aabb.max - overall_aabb.min;
-    let split_axis = if extent.x >= extent.y && extent.x >= extent.z {
+    let safe = |v: f64| if v.is_finite() { v } else { f64::NEG_INFINITY };
+    let ex = safe(extent.x);
+    let ey = safe(extent.y);
+    let ez = safe(extent.z);
+    let split_axis = if ex >= ey && ex >= ez {
         0
-    } else if extent.y >= extent.z {
+    } else if ey >= ez {
         1
     } else {
         2
@@ -146,5 +179,48 @@ fn build_recursive(entries: &mut [(usize, Aabb, Vec3)]) -> BvhNode {
         aabb: overall_aabb,
         left: Box::new(left),
         right: Box::new(right),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::geometry::cell::{self, Cell, CellFill, CellId};
+    use crate::geometry::surface::BoundaryCondition;
+
+    #[test]
+    fn bvh_finds_cells_with_infinite_z_aabb() {
+        // Two CylinderZ pin cells side by side. AABBs are infinite
+        // on z; the BVH must still locate the right cell at z = 0.
+        let surfaces = vec![
+            Surface::CylinderZ {
+                center_x: -1.0,
+                center_y: 0.0,
+                radius: 0.4,
+                bc: BoundaryCondition::Transmission,
+            },
+            Surface::CylinderZ {
+                center_x: 1.0,
+                center_y: 0.0,
+                radius: 0.4,
+                bc: BoundaryCondition::Transmission,
+            },
+        ];
+        let cells = vec![
+            Cell::new(CellId(0), cell::inside(0), CellFill::Material(0))
+                .with_aabb_from_region(&surfaces),
+            Cell::new(CellId(1), cell::inside(1), CellFill::Material(1))
+                .with_aabb_from_region(&surfaces),
+        ];
+        let bvh = Bvh::build(&cells);
+
+        // Point inside left pin at z=0.
+        let pos_left = Vec3::new(-1.0, 0.0, 0.0);
+        assert_eq!(bvh.find_cell(pos_left, &surfaces, &cells), Some(0));
+        // Point inside right pin at z=5 (well outside finite z range).
+        let pos_right = Vec3::new(1.0, 0.0, 5.0);
+        assert_eq!(bvh.find_cell(pos_right, &surfaces, &cells), Some(1));
+        // Point in the gap at the origin — no cell.
+        assert!(bvh.find_cell(Vec3::new(0.0, 0.0, 0.0), &surfaces, &cells).is_none());
     }
 }

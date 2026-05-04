@@ -93,17 +93,23 @@ fn main() {
             } else {
                 MAT_FUEL
             };
-            cells.push(Cell::new(
-                CellId(cells.len() as u32),
-                inside(s_pellet),
-                CellFill::Material(pellet_mat as u32),
-            ));
+            cells.push(
+                Cell::new(
+                    CellId(cells.len() as u32),
+                    inside(s_pellet),
+                    CellFill::Material(pellet_mat as u32),
+                )
+                .with_aabb_from_region(&surfaces),
+            );
             cell_materials.push(pellet_mat);
-            cells.push(Cell::new(
-                CellId(cells.len() as u32),
-                between(s_pellet, s_clad),
-                CellFill::Material(MAT_CLAD as u32),
-            ));
+            cells.push(
+                Cell::new(
+                    CellId(cells.len() as u32),
+                    between(s_pellet, s_clad),
+                    CellFill::Material(MAT_CLAD as u32),
+                )
+                .with_aabb_from_region(&surfaces),
+            );
             cell_materials.push(MAT_CLAD);
         }
     }
@@ -113,35 +119,44 @@ fn main() {
     for &s_clad in &pin_clads {
         water_region = Region::Intersection(Box::new(water_region), Box::new(outside(s_clad)));
     }
-    cells.push(Cell::new(
-        CellId(cells.len() as u32),
-        water_region,
-        CellFill::Material(MAT_WATER as u32),
-    ));
+    cells.push(
+        Cell::new(
+            CellId(cells.len() as u32),
+            water_region,
+            CellFill::Material(MAT_WATER as u32),
+        )
+        .with_aabb_from_region(&surfaces),
+    );
     cell_materials.push(MAT_WATER);
 
-    // Steel barrel.
-    cells.push(Cell::new(
-        CellId(cells.len() as u32),
-        between(s_barrel_inner, s_barrel_outer),
-        CellFill::Material(MAT_STEEL as u32),
-    ));
+    cells.push(
+        Cell::new(
+            CellId(cells.len() as u32),
+            between(s_barrel_inner, s_barrel_outer),
+            CellFill::Material(MAT_STEEL as u32),
+        )
+        .with_aabb_from_region(&surfaces),
+    );
     cell_materials.push(MAT_STEEL);
 
-    // Reflector annulus.
-    cells.push(Cell::new(
-        CellId(cells.len() as u32),
-        between(s_barrel_outer, s_reflector_outer),
-        CellFill::Material(MAT_WATER as u32),
-    ));
+    cells.push(
+        Cell::new(
+            CellId(cells.len() as u32),
+            between(s_barrel_outer, s_reflector_outer),
+            CellFill::Material(MAT_WATER as u32),
+        )
+        .with_aabb_from_region(&surfaces),
+    );
     cell_materials.push(MAT_WATER);
 
-    // Pressure vessel.
-    cells.push(Cell::new(
-        CellId(cells.len() as u32),
-        between(s_reflector_outer, s_vessel_outer),
-        CellFill::Material(MAT_STEEL as u32),
-    ));
+    cells.push(
+        Cell::new(
+            CellId(cells.len() as u32),
+            between(s_reflector_outer, s_vessel_outer),
+            CellFill::Material(MAT_STEEL as u32),
+        )
+        .with_aabb_from_region(&surfaces),
+    );
     cell_materials.push(MAT_STEEL);
 
     let viewport = Viewport::square_centered(VESSEL_OUTER * 1.25, 0.0, 900);

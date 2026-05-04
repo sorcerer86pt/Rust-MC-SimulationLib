@@ -13,9 +13,11 @@
 //! geometry description needed. If the simulation runs, the preview
 //! reflects exactly the geometry it runs on.
 
+pub mod ascii;
 pub mod render;
 
+pub use ascii::{ascii_glyph_for_name, print_ascii, print_ascii_with, render_ascii};
 pub use render::{
-    LegendEntry, MaterialPalette, NamedMaterial, Viewport, legend_from_materials,
-    preview_geometry, render_top_down, show_window,
+    LegendEntry, MaterialPalette, NamedMaterial, Viewport, auto_color_from_name,
+    legend_from_materials, preview_geometry, render_top_down, show_window,
 };

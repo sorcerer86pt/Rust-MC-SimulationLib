@@ -5,6 +5,7 @@
 //! photons per primary so pair-production annihilation γ's are
 //! tracked to extinction.
 
+use crate::geometry::bvh::Bvh;
 use crate::geometry::surface::BoundaryCondition;
 use crate::geometry::{Cell, Surface, Vec3, ray};
 use crate::photon::interactions::{
@@ -74,6 +75,7 @@ pub fn run_photon_fixed_source<S: PhotonSource>(
     tally: Option<&mut FluxTally>,
 ) -> PhotonFixedSourceResult {
     let mut rng = Pcg64::new(cfg.seed, 1);
+    let bvh = Bvh::build(cells);
     let mut batches = Vec::with_capacity(cfg.n_batches as usize);
     let mut tally_box = tally;
 
@@ -85,7 +87,8 @@ pub fn run_photon_fixed_source<S: PhotonSource>(
 
         for _ in 0..cfg.n_particles_per_batch {
             let s: SourcePhoton = source.sample(&mut rng);
-            let cell_idx = ray::find_cell(s.pos, surfaces, cells).unwrap_or(0);
+            let cell_idx =
+                ray::find_cell_bvh(s.pos, surfaces, cells, &bvh).unwrap_or(0);
             let mut stack: Vec<ActivePhoton> = vec![ActivePhoton {
                 pos: s.pos,
                 dir: s.dir,
@@ -99,6 +102,7 @@ pub fn run_photon_fixed_source<S: PhotonSource>(
                     &mut p,
                     cells,
                     surfaces,
+                    &bvh,
                     &cell_material,
                     materials,
                     cfg.energy_cutoff_ev,
@@ -137,6 +141,7 @@ fn transport_one(
     p: &mut ActivePhoton,
     cells: &[Cell],
     surfaces: &[Surface],
+    bvh: &Bvh,
     cell_material: &impl Fn(usize) -> usize,
     materials: &[PhotonMaterial],
     energy_cutoff: f64,
@@ -158,7 +163,7 @@ fn transport_one(
         let material = &materials[mat_idx];
         let sigma_t = material.macro_total(p.energy).max(1e-30);
         let dist_collision = -rng.uniform().ln() / sigma_t;
-        let trace = ray::trace_step(p.pos, p.dir, p.cell_idx, surfaces, cells);
+        let trace = ray::trace_step_opt(p.pos, p.dir, p.cell_idx, surfaces, cells, Some(bvh));
         let dist_surface = trace.as_ref().map_or(f64::INFINITY, |h| h.distance);
 
         if dist_collision < dist_surface {
@@ -238,12 +243,12 @@ fn transport_one(
                         p.dir.z - 2.0 * dot * n.z,
                     );
                     p.pos = p.pos + p.dir * 2.0e-10;
-                    if let Some(c) = ray::find_cell(p.pos, surfaces, cells) {
+                    if let Some(c) = ray::find_cell_bvh(p.pos, surfaces, cells, bvh) {
                         p.cell_idx = c;
                     }
                 }
                 BoundaryCondition::Transmission => {
-                    if let Some(c) = ray::find_cell(p.pos, surfaces, cells) {
+                    if let Some(c) = ray::find_cell_bvh(p.pos, surfaces, cells, bvh) {
                         p.cell_idx = c;
                     } else {
                         *n_leaked += 1;
