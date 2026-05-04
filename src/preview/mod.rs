@@ -15,4 +15,7 @@
 
 pub mod render;
 
-pub use render::{MaterialPalette, Viewport, render_top_down, show_window};
+pub use render::{
+    LegendEntry, MaterialPalette, NamedMaterial, Viewport, legend_from_materials,
+    preview_geometry, render_top_down, show_window,
+};

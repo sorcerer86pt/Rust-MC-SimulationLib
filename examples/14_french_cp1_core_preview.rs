@@ -1,21 +1,17 @@
-//! French CP1-class PWR core preview — 900 MWe Westinghouse 3-loop
-//! design (Almaraz, Ascó, Tricastin, Bugey, Blayais, Cruas, …).
+//! French CP1-class PWR whole-core preview — 900 MWe Westinghouse
+//! 3-loop design (Almaraz / Ascó / Tricastin / Bugey / Blayais /
+//! Cruas …). 161 fuel assemblies arranged on a 21.5 cm pitch in the
+//! standard CP1 footprint, surrounded by core barrel, water
+//! reflector and pressure vessel.
 //!
-//! Layout: 157 fuel assemblies on a 21.5 cm pitch arranged in the
-//! standard CP1 footprint inside a steel core barrel, with a water
-//! reflector annulus and a steel pressure vessel. Each assembly is
-//! drawn as a circle and colour-coded by 3-batch reload region:
+//! Materials are the simulation's ground-truth list — the same
+//! `transport::material::Material` type the eigenvalue and
+//! fixed-source drivers consume. The preview's legend is auto-built
+//! from this list via [`preview_geometry`], so renaming a material
+//! or adding a new one shows up in both the colour swatches and the
+//! pop-up legend without any further glue.
 //!
-//!   * red    — first cycle (fresh fuel, highest enrichment)
-//!   * orange — second cycle (once-burnt, mid-core)
-//!   * green  — third cycle (twice-burnt, periphery)
-//!   * yellow — control-rod cluster positions
-//!
-//! Pin-level structure inside an assembly (pellet + clad + water on
-//! a 17 × 17 grid) is the same as `examples/10_pwr_pin_cell.rs` —
-//! the whole-core preview here intentionally renders one assembly
-//! per circle so the macro pattern reads cleanly without having to
-//! sample 45 000 pin cells per pixel.
+//! Hot keys: drag-resize / scroll zoom / R reset / L legend / Esc.
 //!
 //! Run with:
 //!
@@ -26,73 +22,71 @@
 use rust_mc_sim::geometry::cell::{Cell, CellFill, CellId, between, inside};
 use rust_mc_sim::geometry::surface::BoundaryCondition;
 use rust_mc_sim::geometry::Surface;
-use rust_mc_sim::preview::{MaterialPalette, Viewport, render_top_down, show_window};
+use rust_mc_sim::preview::{MaterialPalette, Viewport, preview_geometry};
+use rust_mc_sim::transport::material::Material;
 
 // ── Plant geometry (cm) ─────────────────────────────────────────────
-// CP1 fuel assembly side: 21.504 cm. Reactor pressure vessel inner
-// radius ≈ 199 cm. Numbers are approximate, dimensioned for a clean
-// preview at this scale.
 const ASSEMBLY_PITCH: f64 = 21.5;
-const ASSEMBLY_RADIUS: f64 = 10.0; // visual radius of an assembly disk
+const ASSEMBLY_RADIUS: f64 = 10.0;
 const CORE_BARREL_INNER: f64 = 165.0;
 const CORE_BARREL_OUTER: f64 = 170.0;
 const REFLECTOR_OUTER: f64 = 195.0;
 const VESSEL_OUTER: f64 = 220.0;
 
-// ── 3-batch reload colour zones (radial cycle) ──────────────────────
-// Core radius dividing the three batches. CP1 uses out-in-in
-// (Westinghouse low-leakage) but for visual clarity we draw the
-// rings as concentric.
-const RADIUS_BATCH_1: f64 = 60.0;  // inner — fresh fuel
-const RADIUS_BATCH_2: f64 = 120.0; // mid   — once-burnt
+// 3-batch reload colour zones (radial, simplified).
+const RADIUS_BATCH_1: f64 = 60.0;
+const RADIUS_BATCH_2: f64 = 120.0;
 
-// ── Control-rod cluster grid positions (i, j on the lattice) ────────
-// CP1 has 53 RCCAs total; we draw a representative subset of the
-// AIC + B4C cluster pattern to keep the preview readable.
+// Representative subset of the 53 RCCA cluster positions.
 const CONTROL_POSITIONS: &[(i32, i32)] = &[
-    (0, 0),  // central
-    (0, 4), (0, -4), (4, 0), (-4, 0),
+    (0, 0), (0, 4), (0, -4), (4, 0), (-4, 0),
     (4, 4), (4, -4), (-4, 4), (-4, -4),
     (0, 7), (0, -7), (7, 0), (-7, 0),
     (3, 6), (3, -6), (-3, 6), (-3, -6),
     (6, 3), (6, -3), (-6, 3), (-6, -3),
 ];
 
-// ── Material indices into the palette ───────────────────────────────
-const MAT_FUEL_FRESH: usize = 0;     // red
-const MAT_FUEL_MID: usize = 4;       // green (we reuse "moderator" slot)
-const MAT_FUEL_BURNT: usize = 5;     // purple-ish ("instrumentation")
-const MAT_WATER: usize = 2;
+// Material indices into the materials list below.
+const MAT_FUEL_FRESH: usize = 0;
+const MAT_FUEL_MID: usize = 1;
+const MAT_FUEL_BURNT: usize = 2;
 const MAT_CONTROL: usize = 3;
-const MAT_STEEL: usize = 6;
+const MAT_WATER: usize = 4;
+const MAT_STEEL: usize = 5;
 
 fn main() {
+    // Materials list — names propagate to the legend automatically.
+    // For a real CP1 core the three "burnup" materials would carry
+    // different nuclide vectors with different ²³⁵U / Pu / FP
+    // inventories at BOC of the cycle; here we just give them
+    // labels.
+    let materials: Vec<Material> = vec![
+        Material::new("first cycle (fresh, ~3.7 % ²³⁵U)", 900.0),
+        Material::new("second cycle (mid-core)", 900.0),
+        Material::new("third cycle (periphery)", 900.0),
+        Material::new("RCCA control cluster (B₄C / AIC)", 583.0),
+        Material::new("light water reflector", 583.0),
+        Material::new("steel core barrel + pressure vessel", 583.0),
+    ];
+
     let mut surfaces: Vec<Surface> = Vec::new();
     let mut cells: Vec<Cell> = Vec::new();
     let mut cell_materials: Vec<usize> = Vec::new();
 
-    // 1) Vessel + barrel cylinders.
-    let s_barrel_inner = push_surface(
+    let s_barrel_inner = push(&mut surfaces, cyl(0.0, 0.0, CORE_BARREL_INNER));
+    let s_barrel_outer = push(&mut surfaces, cyl(0.0, 0.0, CORE_BARREL_OUTER));
+    let s_reflector_outer = push(&mut surfaces, cyl(0.0, 0.0, REFLECTOR_OUTER));
+    let s_vessel_outer = push(
         &mut surfaces,
-        cyl(0.0, 0.0, CORE_BARREL_INNER, BoundaryCondition::Transmission),
+        Surface::CylinderZ {
+            center_x: 0.0,
+            center_y: 0.0,
+            radius: VESSEL_OUTER,
+            bc: BoundaryCondition::Vacuum,
+        },
     );
-    let s_barrel_outer = push_surface(
-        &mut surfaces,
-        cyl(0.0, 0.0, CORE_BARREL_OUTER, BoundaryCondition::Transmission),
-    );
-    let s_reflector_outer = push_surface(
-        &mut surfaces,
-        cyl(0.0, 0.0, REFLECTOR_OUTER, BoundaryCondition::Transmission),
-    );
-    let s_vessel_outer = push_surface(
-        &mut surfaces,
-        cyl(0.0, 0.0, VESSEL_OUTER, BoundaryCondition::Vacuum),
-    );
+    let _ = s_vessel_outer;
 
-    // 2) Place 157 assemblies on the CP1 lattice. Iterate over a
-    // 17 × 17 grid and accept those whose centre falls inside the
-    // CP1 footprint, which we approximate as the maximum circle that
-    // fits an integer count of assemblies on the lattice.
     let cp1_radius = 7.6 * ASSEMBLY_PITCH;
     let mut assembly_count = 0;
     for j in -8_i32..=8 {
@@ -105,10 +99,7 @@ fn main() {
             }
             assembly_count += 1;
             let mat = classify_assembly(i, j, r);
-            let s = push_surface(
-                &mut surfaces,
-                cyl(cx, cy, ASSEMBLY_RADIUS, BoundaryCondition::Transmission),
-            );
+            let s = push(&mut surfaces, cyl(cx, cy, ASSEMBLY_RADIUS));
             cells.push(Cell::new(
                 CellId(cells.len() as u32),
                 inside(s),
@@ -118,10 +109,8 @@ fn main() {
         }
     }
 
-    // 3) Water inside the core barrel — anywhere not already an
-    // assembly disk. We add one cell with region `inside(barrel)`;
-    // the assembly cells appear earlier in the cell list and so
-    // shadow this water cell wherever they cover.
+    // Water inside core barrel; assemblies (defined earlier) shadow
+    // this cell wherever they cover.
     cells.push(Cell::new(
         CellId(cells.len() as u32),
         inside(s_barrel_inner),
@@ -129,7 +118,7 @@ fn main() {
     ));
     cell_materials.push(MAT_WATER);
 
-    // 4) Steel core barrel.
+    // Steel barrel.
     cells.push(Cell::new(
         CellId(cells.len() as u32),
         between(s_barrel_inner, s_barrel_outer),
@@ -137,7 +126,7 @@ fn main() {
     ));
     cell_materials.push(MAT_STEEL);
 
-    // 5) Water reflector annulus between barrel and reflector outer.
+    // Water reflector annulus.
     cells.push(Cell::new(
         CellId(cells.len() as u32),
         between(s_barrel_outer, s_reflector_outer),
@@ -145,7 +134,7 @@ fn main() {
     ));
     cell_materials.push(MAT_WATER);
 
-    // 6) Steel pressure vessel.
+    // Pressure vessel.
     cells.push(Cell::new(
         CellId(cells.len() as u32),
         between(s_reflector_outer, s_vessel_outer),
@@ -153,43 +142,24 @@ fn main() {
     ));
     cell_materials.push(MAT_STEEL);
 
-    let _ = s_vessel_outer;
-
-    // 7) Render and show. The closure re-renders on resize / scroll /
-    // 'R' reset; first frame is the initial 1000 × 1000 view.
-    // Margin = 25 % of the vessel outer radius so non-square window
-    // resizes keep the vessel ring fully on-screen.
     let viewport = Viewport::square_centered(VESSEL_OUTER * 1.25, 0.0, 1000);
-    let palette = MaterialPalette::default();
     println!(
-        "CP1-class core: {assembly_count} assemblies, {} surfaces, {} cells",
+        "CP1-class core: {assembly_count} assemblies, {} surfaces, {} cells, {} materials.",
         surfaces.len(),
-        cells.len()
+        cells.len(),
+        materials.len()
     );
     println!(
-        "drag the window to zoom, scroll to zoom around centre, R to reset, Esc to close."
+        "drag/scroll to zoom, R to reset, L for legend, Esc to close."
     );
-    show_window(
+    preview_geometry(
         viewport,
         "rust-mc-sim — French CP1 900 MWe core preview",
-        |vp| {
-            let t0 = std::time::Instant::now();
-            let buf = render_top_down(
-                &cells,
-                &surfaces,
-                |cell_idx| cell_materials[cell_idx],
-                &palette,
-                vp,
-            );
-            let dt = t0.elapsed().as_secs_f64();
-            println!(
-                "  rendered {}×{} px in {dt:.2} s ({:.1} Mpx/s)",
-                vp.width,
-                vp.height,
-                buf.len() as f64 * 1.0e-6 / dt.max(1.0e-9)
-            );
-            buf
-        },
+        &cells,
+        &surfaces,
+        &materials,
+        |cell_idx| cell_materials[cell_idx],
+        Some(MaterialPalette::default()),
     );
 }
 
@@ -205,16 +175,16 @@ fn classify_assembly(i: i32, j: i32, radius_cm: f64) -> usize {
     }
 }
 
-fn cyl(cx: f64, cy: f64, r: f64, bc: BoundaryCondition) -> Surface {
+fn cyl(cx: f64, cy: f64, r: f64) -> Surface {
     Surface::CylinderZ {
         center_x: cx,
         center_y: cy,
         radius: r,
-        bc,
+        bc: BoundaryCondition::Transmission,
     }
 }
 
-fn push_surface(surfaces: &mut Vec<Surface>, surface: Surface) -> usize {
+fn push(surfaces: &mut Vec<Surface>, surface: Surface) -> usize {
     let idx = surfaces.len();
     surfaces.push(surface);
     idx

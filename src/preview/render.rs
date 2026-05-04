@@ -1,5 +1,82 @@
 use crate::geometry::{Cell, Surface, Vec3, ray};
 
+/// Anything that carries a human-readable material name. Implemented
+/// out of the box for [`crate::transport::material::Material`] and
+/// [`crate::photon::material::PhotonMaterial`] so callers can pass
+/// their existing simulation material lists straight into the
+/// previewer — no parallel "preview material" type to maintain.
+pub trait NamedMaterial {
+    fn name(&self) -> &str;
+}
+
+impl NamedMaterial for crate::transport::material::Material {
+    fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+#[cfg(feature = "preview")]
+impl NamedMaterial for crate::photon::material::PhotonMaterial {
+    fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+/// One row in the legend popup: a colour swatch + a text label.
+#[derive(Debug, Clone)]
+pub struct LegendEntry {
+    pub label: String,
+    pub color: [u8; 3],
+}
+
+impl LegendEntry {
+    pub fn new(label: impl Into<String>, color: [u8; 3]) -> Self {
+        Self {
+            label: label.into(),
+            color,
+        }
+    }
+}
+
+/// Build a legend from a list of materials and a palette. Material
+/// at index `i` is paired with `palette.colors[i]` (or `palette.void`
+/// for indices past the palette).
+///
+/// This is the OpenMC-Python-style auto-derivation: define your
+/// materials once, the legend follows.
+pub fn legend_from_materials<M: NamedMaterial>(
+    materials: &[M],
+    palette: &MaterialPalette,
+) -> Vec<LegendEntry> {
+    materials
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            let color = palette.colors.get(i).copied().unwrap_or(palette.void);
+            LegendEntry::new(m.name(), color)
+        })
+        .collect()
+}
+
+/// One-shot OpenMC-style preview: open a window, render the geometry
+/// top-down, derive the legend from the supplied materials list.
+/// Wraps [`show_window`] + [`render_top_down`] + [`legend_from_materials`].
+pub fn preview_geometry<M: NamedMaterial>(
+    initial: Viewport,
+    title: &str,
+    cells: &[Cell],
+    surfaces: &[Surface],
+    materials: &[M],
+    cell_to_material: impl Fn(usize) -> usize + Sync,
+    palette: Option<MaterialPalette>,
+) {
+    let palette = palette.unwrap_or_default();
+    let legend = legend_from_materials(materials, &palette);
+    show_window(initial, title, legend, |vp| {
+        render_top_down(cells, surfaces, &cell_to_material, &palette, vp)
+    });
+}
+
 /// World-space window for a top-down slice render.
 #[derive(Debug, Clone, Copy)]
 pub struct Viewport {
@@ -109,15 +186,23 @@ fn pack_rgb([r, g, b]: [u8; 3]) -> u32 {
 /// Behaviour:
 ///   * Drag-resize the window — the cm-per-pixel ratio is held
 ///     constant, so a bigger window zooms *out* (more area visible)
-///     and a smaller window zooms *in*. This matches the natural
-///     "your screen is your viewport" intuition.
+///     and a smaller window zooms *in*.
 ///   * Scroll wheel — multiplicative zoom around the viewport's
-///     centre. Each notch shrinks (`up`) or expands (`down`) the
-///     world-space extent by a constant factor.
+///     centre.
 ///   * `R` — reset to the initial viewport.
-///   * `Esc` or window-X — close.
-pub fn show_window<F>(initial: Viewport, title: &str, mut render: F)
-where
+///   * `L` — toggle the legend popup (a second window listing the
+///     palette colours and what they mean). Closing the legend
+///     window manually has the same effect as toggling it off.
+///   * `Esc` or main window-X — close.
+///
+/// Pass `legend` empty (`Vec::new()`) to disable the popup; in that
+/// case `L` does nothing.
+pub fn show_window<F>(
+    initial: Viewport,
+    title: &str,
+    legend: Vec<LegendEntry>,
+    mut render: F,
+) where
     F: FnMut(&Viewport) -> Vec<u32>,
 {
     use minifb::{Key, Window, WindowOptions};
@@ -138,17 +223,16 @@ where
     let mut buffer = render(&viewport);
     let mut last_size = (viewport.width as usize, viewport.height as usize);
     let mut prev_r_pressed = false;
+    let mut prev_l_pressed = false;
+    let mut legend_window: Option<(Window, Vec<u32>, usize, usize)> = None;
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         let cur_size = window.get_size();
         let mut needs_render = false;
 
-        // Window drag-resize → constant cm/pixel zoom.
         if cur_size != last_size && cur_size.0 > 0 && cur_size.1 > 0 {
             let cx = (viewport.x_min + viewport.x_max) * 0.5;
             let cy = (viewport.y_min + viewport.y_max) * 0.5;
-            // Use the initial cm-per-pixel as the anchor so the user
-            // can drag back to the same scale they started at.
             let world_w = viewport.x_max - viewport.x_min;
             let world_h = viewport.y_max - viewport.y_min;
             let px_per_cm_x = viewport.width as f64 / world_w;
@@ -166,7 +250,6 @@ where
             needs_render = true;
         }
 
-        // Scroll-wheel zoom around the viewport centre.
         if let Some((_, sy)) = window.get_scroll_wheel() {
             if sy.abs() > 0.0 {
                 let factor = if sy > 0.0 { 0.85 } else { 1.0 / 0.85 };
@@ -182,25 +265,112 @@ where
             }
         }
 
-        // 'R' resets the view (debounced — fire on press, not hold).
         let r_now = window.is_key_down(Key::R);
         if r_now && !prev_r_pressed {
             viewport = initial;
-            // Window size doesn't follow the viewport reset
-            // (minifb has no programmatic resize), so respect the
-            // current physical window size by treating it as a
-            // resize event the next iteration.
             last_size = (0, 0);
             needs_render = true;
         }
         prev_r_pressed = r_now;
 
+        // Legend toggle. Pressing L when the legend is closed opens
+        // it; pressing again closes it. If the user closes the
+        // legend window directly (X), drop it on the next iteration.
+        let l_now = window.is_key_down(Key::L);
+        if l_now && !prev_l_pressed && !legend.is_empty() {
+            if legend_window.is_some() {
+                legend_window = None;
+            } else {
+                let (buf, w, h) = render_legend(&legend);
+                let win = Window::new(
+                    "rust-mc-sim — legend",
+                    w,
+                    h,
+                    WindowOptions {
+                        resize: false,
+                        ..WindowOptions::default()
+                    },
+                )
+                .unwrap_or_else(|e| panic!("failed to open legend window: {e}"));
+                legend_window = Some((win, buf, w, h));
+            }
+        }
+        prev_l_pressed = l_now;
+
+        if let Some((lw, lbuf, lw_w, lw_h)) = legend_window.as_mut() {
+            if !lw.is_open() || lw.is_key_down(Key::Escape) {
+                legend_window = None;
+            } else {
+                lw.update_with_buffer(lbuf, *lw_w, *lw_h)
+                    .unwrap_or_else(|e| panic!("failed to blit legend: {e}"));
+            }
+        }
+
         if needs_render {
             buffer = render(&viewport);
         }
-
         window
             .update_with_buffer(&buffer, viewport.width as usize, viewport.height as usize)
             .unwrap_or_else(|e| panic!("failed to blit framebuffer: {e}"));
     }
+}
+
+/// Build the legend popup framebuffer. Each entry gets one row:
+/// 32 × 32 colour swatch on the left, label rendered with `font8x8`
+/// to the right. Window size is sized to fit all entries.
+fn render_legend(legend: &[LegendEntry]) -> (Vec<u32>, usize, usize) {
+    use font8x8::UnicodeFonts;
+
+    let scale = 2_usize; // upscale 8 × 8 glyphs to 16 × 16 for readability
+    let row_height = 36_usize;
+    let swatch = 28_usize;
+    let pad_x = 12_usize;
+    let pad_y = 8_usize;
+    let max_label_chars = legend.iter().map(|e| e.label.chars().count()).max().unwrap_or(0);
+    let label_width = max_label_chars * 8 * scale;
+    let w = pad_x + swatch + 12 + label_width + pad_x;
+    let h = pad_y * 2 + row_height * legend.len().max(1);
+    let bg: u32 = 0x1A1A24;
+    let text_color: u32 = 0xE8E8F0;
+    let mut buf = vec![bg; w * h];
+
+    for (row, entry) in legend.iter().enumerate() {
+        let y0 = pad_y + row * row_height + (row_height - swatch) / 2;
+        let x0 = pad_x;
+        let swatch_color = pack_rgb(entry.color);
+        // Draw the swatch with a 1-px frame for contrast.
+        for dy in 0..swatch {
+            for dx in 0..swatch {
+                let py = y0 + dy;
+                let px = x0 + dx;
+                if px < w && py < h {
+                    let on_border =
+                        dx == 0 || dy == 0 || dx == swatch - 1 || dy == swatch - 1;
+                    buf[py * w + px] = if on_border { 0x000000 } else { swatch_color };
+                }
+            }
+        }
+        // Draw the label.
+        let label_x = x0 + swatch + 12;
+        let label_y = pad_y + row * row_height + (row_height - 8 * scale) / 2;
+        for (i, ch) in entry.label.chars().enumerate() {
+            let glyph = font8x8::BASIC_FONTS.get(ch).unwrap_or([0u8; 8]);
+            for (gy, byte) in glyph.iter().enumerate() {
+                for gx in 0..8 {
+                    if (byte >> gx) & 1 != 0 {
+                        for sy in 0..scale {
+                            for sx in 0..scale {
+                                let px = label_x + i * 8 * scale + gx * scale + sx;
+                                let py = label_y + gy * scale + sy;
+                                if px < w && py < h {
+                                    buf[py * w + px] = text_color;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    (buf, w, h)
 }

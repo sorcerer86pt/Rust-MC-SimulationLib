@@ -27,6 +27,9 @@ quick-xml = { version = "0.36", optional = true }
 # minifb powers the optional `preview` feature: cross-platform
 # pixel-buffer window for static geometry previews.
 minifb = { version = "0.27", optional = true }
+# font8x8 ships an embedded 8 × 8 ASCII bitmap font used by the
+# preview's legend window. Pure Rust, ~7 KB compiled, no_std.
+font8x8 = { version = "0.3", optional = true, default-features = false, features = ["unicode"] }
 
 [features]
 # Default ships only the pure-math layer (svd, cp, ducru, cdf, rng).
@@ -47,7 +50,7 @@ chain = ["dep:quick-xml"]
 # Static geometry previewer — opens a window and renders a top-down
 # CSG slice into it. Useful for sanity-checking a reactor or
 # shielding geometry before launching a full Monte Carlo run.
-preview = ["dep:minifb"]
+preview = ["dep:minifb", "dep:font8x8"]
 
 [dev-dependencies]
 # Add criterion later if we want benchmarks; keep deps minimal for now.
