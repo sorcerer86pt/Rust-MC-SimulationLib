@@ -13,6 +13,7 @@ pub mod depletion;
 pub mod doppler;
 pub mod ducru;
 pub mod error;
+pub mod expm;
 pub mod fission_yields;
 pub mod geometry;
 pub mod kinetics;

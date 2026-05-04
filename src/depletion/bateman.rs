@@ -92,7 +92,6 @@ mod tests {
     use crate::decay::{DecayMode, DecayNuclide, ReactionTarget};
 
     #[test]
-    #[ignore = "depends on cram::cram16_dense — v0.1, see cram.rs caveats"]
     fn pure_decay_step_advances_state() {
         // A → B with t½(A) = 10 s. After one half-life we expect
         // ~half the A and ~half the B (mass conservation).

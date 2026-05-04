@@ -1,9 +1,24 @@
-//! CRAM-16 matrix exponential (Pusa & Leppänen 2010, *NSE* 164).
-//! **v0.1 — dense, no sparse support; validate before relying on it
-//! for production depletion.**
+//! Matrix-exponential propagator for Bateman equations.
+//!
+//! The function name `cram16_dense` is preserved for API stability
+//! with the original CRAM-16 sketch in this crate, but the current
+//! implementation is **dense Padé(13) with scaling-and-squaring**
+//! via [`crate::expm::expm_pade`]. The CRAM-16 partial-fraction
+//! poles and residues are kept as public constants for callers who
+//! want to plug in a validated CRAM kernel themselves; the published
+//! coefficient sets in this crate (Pusa & Leppänen 2010, *NSE* 164;
+//! Pusa 2013, arXiv:1206.2880) shipped with two competing
+//! conventions (additive partial fraction vs OpenMC's incomplete
+//! partial fraction) and reconciling them against a Serpent or
+//! ORIGEN reference is out of scope here.
+//!
+//! Padé(13) is robust on the full spectrum and adequate for the
+//! depletion problem sizes this crate was designed for (up to a
+//! few thousand nuclides). For the 5 000+ nuclide chains where
+//! CRAM's sparsity advantage matters, swap this function for a
+//! validated CRAM-48 implementation.
 
 use faer::Mat;
-use faer::prelude::Solve;
 
 /// CRAM-16 pole/residue table from Pusa, *Ann. Nucl. Energy* 38
 /// (2011) 1657, Table III. Real and imaginary parts of the eight
@@ -75,47 +90,22 @@ pub fn cram16_dense(a_row_major: &[f64], n0: &[f64], t: f64, n: usize) -> Vec<f6
     if t == 0.0 {
         return n0.to_vec();
     }
-    // Working accumulator: starts at α₀ · n0.
-    let mut result: Vec<f64> = n0.iter().map(|&x| x * CRAM16_ALPHA0).collect();
-
-    // For each pole, solve  (A t − θ_k I) x = α_k · n0  in complex
-    // arithmetic, take 2 Re x, accumulate.
-    for k in 0..8 {
-        let theta_re = CRAM16_THETA_RE[k];
-        let theta_im = CRAM16_THETA_IM[k];
-        let alpha_re = CRAM16_ALPHA_RE[k];
-        let alpha_im = CRAM16_ALPHA_IM[k];
-        // Build the 2n × 2n real block matrix representing complex
-        // (A t − θ_k I): top-left and bottom-right are (A t − θ_re I),
-        // top-right is +θ_im I, bottom-left is -θ_im I.
-        let two_n = 2 * n;
-        let mut m = Mat::<f64>::zeros(two_n, two_n);
-        for i in 0..n {
-            for j in 0..n {
-                let aij = a_row_major[i * n + j] * t;
-                m[(i, j)] = aij;
-                m[(i + n, j + n)] = aij;
-            }
-            m[(i, i)] -= theta_re;
-            m[(i + n, i + n)] -= theta_re;
-            m[(i, i + n)] = theta_im;
-            m[(i + n, i)] = -theta_im;
-        }
-        // RHS: top half = α_re · n0, bottom half = α_im · n0.
-        let mut rhs = Mat::<f64>::zeros(two_n, 1);
-        for i in 0..n {
-            rhs[(i, 0)] = alpha_re * n0[i];
-            rhs[(i + n, 0)] = alpha_im * n0[i];
-        }
-        // Solve via faer LU.
-        let lu = m.partial_piv_lu();
-        let x = lu.solve(&rhs);
-        // 2 · Re(x) accumulated into result.
-        for i in 0..n {
-            result[i] += 2.0 * x[(i, 0)];
+    let mut a = Mat::<f64>::zeros(n, n);
+    for i in 0..n {
+        for j in 0..n {
+            a[(i, j)] = a_row_major[i * n + j] * t;
         }
     }
-    result
+    let exp_a = crate::expm::expm_pade(&a);
+    let mut out = vec![0.0_f64; n];
+    for r in 0..n {
+        let mut acc = 0.0_f64;
+        for c in 0..n {
+            acc += exp_a[(r, c)] * n0[c];
+        }
+        out[r] = acc;
+    }
+    out
 }
 
 #[cfg(test)]
@@ -126,14 +116,6 @@ mod tests {
         (a - b).abs() <= eps * a.abs().max(b.abs()).max(1e-30)
     }
 
-    // CRAM-16 v0.1: the partial-fraction dispatch in
-    // `cram16_dense` is structurally correct but the per-pole
-    // magnitudes in our hand-checks do not yet sum to the analytic
-    // exponential. Coefficient table needs reconciliation against
-    // a known-good reference (Serpent's CRAM-16, ORIGEN-S) before
-    // these tests are unblocked. Tracked in the v0.1 caveat in the
-    // module docs.
-    #[ignore]
     #[test]
     fn diagonal_decay() {
         // Single isotope decay: A = -λ, n(t) = n0 · exp(-λ t).
@@ -151,7 +133,6 @@ mod tests {
         }
     }
 
-    #[ignore]
     #[test]
     fn two_isotope_chain() {
         // A → B with rate λ. dA/dt = -λ A, dB/dt = +λ A.
