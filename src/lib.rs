@@ -17,6 +17,7 @@ pub mod expm;
 pub mod fission_yields;
 pub mod geometry;
 pub mod kinetics;
+pub mod photon;
 pub mod physics;
 pub mod rng;
 pub mod svd;
