@@ -55,8 +55,6 @@ impl NuclideData {
                 detail: "no nuclide group found at root".into(),
             })?;
 
-        println!("  Nuclide: {nuclide_name}");
-
         let nuclide_group = root.group(&nuclide_name).map_err(|e| SvdError::Hdf5 {
             path: path.display().to_string(),
             detail: format!("cannot open /{nuclide_name}: {e}"),
@@ -86,8 +84,6 @@ impl NuclideData {
             .filter_map(|l| parse_temp_kelvin(l))
             .collect();
 
-        println!("  Temperatures: {temp_labels:?}");
-
         // Read per-temperature energy grids
         let mut energy_grids: Vec<Vec<f64>> = Vec::with_capacity(temp_labels.len());
         for label in &temp_labels {
@@ -106,7 +102,6 @@ impl NuclideData {
         let mut union: Vec<f64> = energy_grids.iter().flatten().copied().collect();
         union.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         union.dedup();
-        println!("  Unionized energy grid: {} points", union.len());
 
         // Read cross-sections per temperature
         let rxn_name = format!("reaction_{mt:03}");
@@ -2583,8 +2578,6 @@ pub fn load_thermal_scattering(path: &Path) -> Result<ThermalScatteringData> {
 
     let temp_labels: Vec<String> = temp_data.iter().map(|(l, _)| l.clone()).collect();
     let kts: Vec<f64> = temp_data.iter().map(|(_, kt)| *kt).collect();
-
-    println!("  Temperatures: {temp_labels:?}");
 
     // Read inelastic data per temperature
     let mut inelastic = Vec::with_capacity(temp_labels.len());

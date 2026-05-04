@@ -44,12 +44,17 @@ pub mod nuclear {
     pub mod hdf5 {
         pub use crate::nuclear_hdf5::*;
     }
+    pub mod loader {
+        pub use crate::nuclear_loader::*;
+    }
 }
 
 // Internal modules backing `nuclear::*`. Kept private so the public
 // paths are stable across implementation reshuffles.
 #[cfg(feature = "nuclear")]
 mod nuclear_hdf5;
+#[cfg(feature = "nuclear")]
+mod nuclear_loader;
 #[cfg(feature = "nuclear")]
 mod nuclear_thermal;
 #[cfg(feature = "nuclear")]
