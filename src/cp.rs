@@ -1,25 +1,5 @@
-//! CP / PARAFAC decomposition of a 3-tensor.
-//!
-//! Factorises a 3-tensor `X[i, t, k]` of shape `(n_a, n_b, n_c)` as
-//! a sum of `R` rank-1 outer products:
-//!
-//! ```text
-//!     X[i, t, k] ≈ Σ_r σ_r · a_r[i] · b_r[t] · c_r[k]
-//! ```
-//!
-//! Implementation: greedy rank-1 deflation via tensor power iteration,
-//! one component at a time. Each round runs alternating
-//! `a → b → c` updates with re-normalisation until the dominant
-//! magnitude converges; the rank-1 contribution is then subtracted
-//! from the residual and the next component is fit. Sub-optimal vs
-//! full alternating-least-squares CP for any fixed `R`, but each
-//! component is well-defined and stable, which is the right
-//! trade-off for an analysis or compression probe and avoids the
-//! initialisation sensitivity of joint ALS.
-//!
-//! For a fully joint ALS-CP optimum, swap the inner loop in
-//! [`cp_greedy_rank1`] for a Khatri-Rao-based update; the public
-//! [`CpDecomposition`] type is independent of the fitting algorithm.
+//! CP / PARAFAC of a 3-tensor via greedy rank-1 power-iteration
+//! deflation.
 
 #![allow(clippy::needless_range_loop)]
 

@@ -1,60 +1,21 @@
-//! `rust-mc-sim` — low-rank approximations for tabulated
-//! multi-way data, with a (feature-gated) OpenMC-compatible
-//! nuclear-data layer.
-//!
+//! Reusable building blocks for Monte Carlo simulation in Rust.
 //! Extracted from
-//! [open_rust_mc](https://github.com/sorcerer86pt/open_rust_mc) so
-//! the validated algorithms can be reused outside the original
-//! Monte Carlo neutron transport context.
-//!
-//! # Layers
-//!
-//! Pure math (always available):
-//!
-//! * [`svd`] — truncated SVD via faer + cache-friendly
-//!   reconstruction kernel with optional log-uniform hash index.
-//! * [`table`] — production-baseline pointwise table with log-log
-//!   interpolation and OpenMC-style stochastic temperature
-//!   pseudo-interpolation. The right pick when you want byte-exact
-//!   values at grid points (no SVD reconstruction error).
-//! * [`cp`] — CP / PARAFAC decomposition of a 3-tensor (greedy
-//!   rank-1 deflation).
-//! * [`ducru`] — Ducru-2017 free-Doppler weights for off-grid
-//!   reconstruction, raw and partition-of-unity normalised.
-//! * [`cdf`] — log-decimated CDF with inverse-transform sampling
-//!   for categorical outcomes whose probabilities depend on a
-//!   continuous coordinate.
-//! * [`rng`] — PCG-64 RNG used by [`cdf`] sampling and the
-//!   nuclear-data layer; exposed so callers can plug their own
-//!   reproducible streams in.
-//! * [`batch`] — sequential and (with `feature = "parallel"`) rayon
-//!   batch APIs for at-scale loads (200k-nuclide depletion-style
-//!   libraries, large CP-decomposition sweeps).
-//!
-//! Nuclear-data layer (`feature = "nuclear"`, pulls in `hdf5-pure`):
-//!
-//! * [`nuclear::wmp`] — Windowed Multipole evaluator with
-//!   Humlicek W4 Faddeeva.
-//! * [`nuclear::thermal`] — S(α,β) thermal scattering kernels and
-//!   sampling.
-//! * [`nuclear::hdf5`] — pure-Rust OpenMC HDF5 reader (cross
-//!   sections, level metadata, angular distributions, energy
-//!   distributions, URR, S(α,β)).
-//!
-//! # Re-exports
-//!
-//! For convenience, the pure-math types are re-exported at the
-//! crate root so the typical caller can write
-//! `use rust_mc_sim::{SvdKernel, ducru_unity_weights};`.
+//! [open_rust_mc](https://github.com/sorcerer86pt/open_rust_mc).
+//! Math layer is always available; the `nuclear` feature adds
+//! OpenMC HDF5 / WMP / S(α,β); `parallel` adds rayon batch APIs.
 
 pub mod batch;
 pub mod cdf;
 pub mod cp;
+pub mod cram;
+pub mod doppler;
 pub mod ducru;
 pub mod error;
+pub mod physics;
 pub mod rng;
 pub mod svd;
 pub mod table;
+pub mod urr;
 
 #[cfg(feature = "nuclear")]
 pub mod nuclear {

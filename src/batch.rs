@@ -1,42 +1,5 @@
-//! Batch APIs for at-scale workloads.
-//!
-//! The single-decomposition APIs in [`crate::svd`], [`crate::cp`], and
-//! [`crate::cdf`] are the right shape for a single nuclide / a single
-//! tabulated function. At depletion-library scale (hundreds to
-//! hundreds-of-thousands of independent decompositions) you want to
-//! fan out across cores and avoid the per-kernel overhead of
-//! eagerly-built lookup indices.
-//!
-//! This module collects the helpers that matter at that scale:
-//!
-//! * [`decompose_many`] / [`decompose_many_par`] — sequential or
-//!   rayon-parallel SVD of many independent matrices, one
-//!   [`crate::Svd`] per input.
-//! * [`from_data_many`] / [`from_data_many_par`] — same but returning
-//!   ready-to-use [`crate::SvdKernel`]s.
-//! * [`cp_many`] / [`cp_many_par`] — batch CP/PARAFAC decomposition.
-//! * [`cdf_many`] / [`cdf_many_par`] — batch [`LogDecimatedCdf`]
-//!   construction.
-//!
-//! Sequential variants are always available. Parallel variants are
-//! gated behind `feature = "parallel"` and pull in `rayon` only when
-//! enabled — pure-math callers that don't need it pay nothing.
-//!
-//! # Memory at scale
-//!
-//! At 200k SvdKernels with rank=5, a 6-column training set, and an
-//! 8000-row energy axis, the basis alone is 200_000 * 8000 * 5 * 8 ≈
-//! **64 GB**. That's a lot, but it fits on a single workstation if
-//! you provision RAM and stream the work in chunks (process N at a
-//! time, write to disk, drop). Use [`SvdKernel::from_factors`] to
-//! reload pre-computed basis bytes if you persist them.
-//!
-//! The optional [`crate::svd::LogHashIndex`] is built automatically by
-//! [`SvdKernel::from_data`] when the row axis has more than 100
-//! points — at 200k kernels the cumulative cost of those hashes is
-//! ~6.4 GB. Use [`SvdKernel::from_factors`] (no hash) and rely on the
-//! binary-search fallback when memory is the binding constraint, or
-//! call [`SvdKernel::build_hash`] selectively for the hot kernels.
+//! Sequential and (with `feature = "parallel"`) rayon batch APIs
+//! for many independent decompositions.
 
 use std::sync::Arc;
 

@@ -1,10 +1,4 @@
-//! Error types used by the optional `nuclear` modules
-//! (HDF5 reader, WMP, thermal scattering).
-//!
-//! Kept narrow on purpose: pure-math modules (svd, cp, ducru, cdf)
-//! do not return [`Result`] — they panic on contract violations
-//! (out-of-bounds, dimension mismatch). Only the I/O-bearing
-//! nuclear-data layer can fail in user-recoverable ways.
+//! Error type for the I/O-bearing `nuclear` modules.
 
 use std::fmt;
 

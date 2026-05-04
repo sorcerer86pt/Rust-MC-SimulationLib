@@ -1,37 +1,6 @@
-//! Truncated singular value decomposition with cache-friendly
-//! reconstruction.
-//!
-//! [`Svd`] wraps a faer-computed truncated SVD as a row-major
-//! `(U·Σ, Vᵀ)` factor pair. [`SvdKernel`] is the deployment-time
-//! engine: pre-multiplied basis stored row-major
-//! `basis[i*rank + j] = U[i,j] · σ_j`, and a `rank × n_t` matrix of
-//! `Vᵀ` columns. Reconstruction at column index `t` is a length-`rank`
-//! dot product per row of `basis` against a pre-computed vector
-//! `coeffs[j] = Vᵀ[j,t]`. The hot path is pure FMA; `coeffs` fits in
-//! registers and `basis` streams sequentially.
-//!
-//! # Off-column reconstruction
-//!
-//! For a target column `t*` that does not coincide with one of the
-//! training columns, [`SvdKernel::ducru_coeffs`] computes
-//! Ducru-weighted reconstruction coefficients via
-//! [`crate::ducru::ducru_weights`]:
-//!
-//! ```text
-//!     coeffs[j] = Σ_t  w_t · Vᵀ[j, t]
-//! ```
-//!
-//! The weights are exact at training columns and L2-optimal between
-//! them under the free-Doppler kernel approximation that motivates
-//! Ducru et al. 2017.
-//!
-//! # Index lookup
-//!
-//! Continuous lookups against a sorted-ascending row axis are
-//! supported via [`LogHashIndex`]: O(1) hash to a log-uniform bin
-//! followed by a short linear scan, fastest when the row axis spans
-//! many decades. Falls through to a binary search at construction
-//! when the row count is small.
+//! Truncated SVD via faer ([`Svd`]) and a pre-multiplied
+//! reconstruction kernel ([`SvdKernel`]) with optional log-uniform
+//! hash index ([`LogHashIndex`]).
 
 use std::sync::Arc;
 

@@ -1,44 +1,6 @@
-//! Pointwise table with log-log interpolation — the production
-//! baseline for tabulated `f(x)` data.
-//!
-//! [`PointwiseTable`] mirrors what OpenMC ships in production: store
-//! the raw `(x, f)` pairs on a sorted-ascending row axis, locate the
-//! bracketing pair via binary search (or [`crate::svd::LogHashIndex`]
-//! for O(1) lookup), and interpolate between them in log-log space:
-//!
-//! ```text
-//!     log f = log f_lo + λ (log f_hi - log f_lo),    λ = log(x/x_lo) / log(x_hi/x_lo)
-//! ```
-//!
-//! Falls back to linear interpolation in `f` when either bracket value
-//! is non-positive (matches the OpenMC convention).
-//!
-//! [`StochTempTable`] composes two endpoints and adds OpenMC-style
-//! stochastic temperature pseudo-interpolation: the per-lookup pick
-//! draws `ξ ∈ [0,1)` and returns the lower endpoint with probability
-//! `p_lo = (T_hi − T) / (T_hi − T_lo)`. The pick is *correlated*
-//! across channels for a single physics event — see
-//! [`StochTempTable::draw_pick`] and [`StochTempTable::lookup_at_idx_with_pick`].
-//!
-//! # Why this lives next to SVD
-//!
-//! Use [`PointwiseTable`] when:
-//!
-//! * You want OpenMC-byte-compatible cross-section evaluation (no
-//!   reconstruction error — the value at every grid point is exact).
-//! * You're benchmarking SVD memory/throughput against the
-//!   production lookup as the baseline.
-//! * Your library has only one or two temperatures so SVD has nothing
-//!   to compress on the column axis.
-//!
-//! Use [`crate::svd::SvdKernel`] when:
-//!
-//! * You have ≥ 4 temperature columns and want a memory win on the
-//!   `Vᵀ` side.
-//! * You need off-grid temperature reconstruction via Ducru weights.
-//!
-//! Both types take an `Arc<[f64]>` row axis so callers holding many
-//! tables can share the grid for free.
+//! Pointwise table ([`PointwiseTable`]) with log-log interpolation
+//! and OpenMC-style stochastic two-endpoint temperature
+//! pseudo-interpolation ([`StochTempTable`]).
 
 use std::sync::Arc;
 

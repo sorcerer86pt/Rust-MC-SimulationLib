@@ -1,48 +1,15 @@
-//! Log-decimated cumulative distribution `F_k(x)` for inverse-transform
-//! sampling of categorical outcomes whose probabilities depend on a
-//! continuous coordinate.
-//!
-//! Given a 2-tensor `σ_k(x)` of "intensities" for category `k ∈ 0..K`
-//! at sample point `x`, we typically want to:
-//!
-//! 1. compute the total intensity `Σ(x) = Σ_k σ_k(x)` (e.g. for
-//!    deciding *whether* an event happens — this is the main XS sum);
-//! 2. sample which category `k` was selected, with probability
-//!    `σ_k(x) / Σ(x)`.
-//!
-//! Storing the per-category intensities at full resolution and
-//! recomputing the CDF at every sample is expensive. The categorical
-//! distribution `F_k(x) = Σ_{k'≤k} σ_{k'}(x) / Σ(x)` is bounded in
-//! `[0, 1]` and (for typical scientific tabulations) varies smoothly
-//! in `x` because peaks in the individual `σ_k` cancel in the ratio.
-//!
-//! [`LogDecimatedCdf`] tabulates `F_k(x)` on a log-spaced grid (default
-//! ~200 points) and samples by bracketed binary scan with linear
-//! interpolation in `log(x)`. For a 41-category × 6-column input
-//! this drops storage from hundreds of MB to ~400 KB at sub-pcm
-//! reconstruction error.
-//!
-//! For an off-column target (e.g. an off-grid temperature) callers
-//! should pre-blend the per-column intensities via the Ducru weights
-//! in [`crate::ducru`] before constructing the CDF, then store only
-//! a single column (`n_cols = 1`).
-//!
-//! # Quick example
+//! Log-decimated CDF `F_k(x)` for inverse-transform sampling of
+//! categorical outcomes with `x`-dependent probabilities.
 //!
 //! ```
 //! use rust_mc_sim::cdf::LogDecimatedCdf;
-//! // Three categories whose probabilities depend on x ∈ [1, 100].
-//! // Simple smooth shapes for illustration.
 //! let xs: Vec<f64> = (0..50).map(|i| 1.0 * 1.1f64.powi(i)).collect();
-//! let n_cat = 3;
-//! let mut intensities = vec![vec![0.0_f64; xs.len()]; n_cat];
-//! for (j, &x) in xs.iter().enumerate() {
-//!     intensities[0][j] = 1.0 / x;             // declines with x
-//!     intensities[1][j] = (x.ln() / 5.0).max(0.0); // grows with x
-//!     intensities[2][j] = 1.0;                  // flat
-//! }
+//! let intensities = vec![
+//!     xs.iter().map(|x| 1.0 / x).collect::<Vec<_>>(),
+//!     xs.iter().map(|x| (x.ln() / 5.0).max(0.0)).collect(),
+//!     vec![1.0_f64; xs.len()],
+//! ];
 //! let cdf = LogDecimatedCdf::from_intensities(&intensities, &xs, 200);
-//! // Sample at x = 10 with ξ = 0.42:
 //! let k = cdf.sample(10.0, 0.42);
 //! assert!(k < 3);
 //! ```

@@ -1,11 +1,4 @@
-//! PCG-64 pseudo-random generator.
-//!
-//! Used by the [`crate::nuclear::thermal`] sampling routines and
-//! exposed for callers that want a cheap, reproducible, parallel-safe
-//! RNG with deterministic skip-ahead semantics.
-//!
-//! Imported from `open_rust_mc/src/transport/rng.rs` unchanged
-//! (PCG-XSH-RR 64/32 stream variant of O'Neill 2014).
+//! PCG-XSH-RR 64/32 (O'Neill 2014).
 
 /// PCG-XSH-RR 64/32 generator.
 #[derive(Debug, Clone)]

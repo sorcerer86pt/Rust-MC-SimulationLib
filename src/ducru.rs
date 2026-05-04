@@ -1,34 +1,6 @@
-//! Ducru-weighted reconstruction for off-grid column targets.
-//!
-//! Given training samples of a function `f(x, t)` at column values
-//! `{t_1, …, t_N}` (e.g. temperatures, configurations…), the
-//! Ducru weights produce the reconstruction
-//!
-//! ```text
-//!     f(x, t_target) ≈ Σ_j w_j(t_target) · f(x, t_j)
-//! ```
-//!
-//! that is L2-optimal under a free-Doppler kernel approximation
-//! (Ducru et al., *J. Comput. Phys.* 335, 2017, Eq. 31), exact at
-//! training columns, and falls off smoothly between them.
-//!
-//! Two variants are provided:
-//!
-//! * [`ducru_weights`] — raw weights from Eq. 31. Optimal in the
-//!   weight-fitting sense; **not** a partition of unity. For
-//!   resonance-dominated channels these introduce a multiplicative
-//!   gain error on peaks.
-//!
-//! * [`ducru_unity_weights`] — the same weights with `w ← w / Σ w`
-//!   normalisation (partition of unity). Preserves peak height by
-//!   construction at the cost of a small global L2 increase. The
-//!   right default when the underlying function has sharp features
-//!   you want preserved.
-//!
-//! [`nearest_k_columns`] picks the `k` training columns closest to
-//! the target — the typical preconditioning before computing 3-point
-//! unity weights, which are stable on the nearest-three subset and
-//! numerically dangerous on longer subsets.
+//! Ducru free-Doppler reconstruction weights (Ducru et al., JCP 335,
+//! 2017, Eq. 31). Raw and partition-of-unity variants. Use the
+//! 3-point unity form on the nearest three columns for production.
 
 /// Raw Ducru (2017) Eq. 31 weights.
 ///
