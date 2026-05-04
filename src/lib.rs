@@ -57,7 +57,9 @@ mod nuclear_wmp;
 // Convenience re-exports for the pure-math API.
 pub use cdf::LogDecimatedCdf;
 pub use cp::{CpDecomposition, cp_greedy_rank1, max_abs_error, relative_l2_error};
-pub use ducru::{ducru_unity_weights, ducru_weights, nearest_k_columns};
+pub use ducru::{
+    ducru_constrained_weights, ducru_unity_weights, ducru_weights, nearest_k_columns,
+};
 pub use rng::Pcg64;
 pub use svd::{LogHashIndex, Svd, SvdKernel};
 pub use table::{PointwiseTable, StochTempTable};
