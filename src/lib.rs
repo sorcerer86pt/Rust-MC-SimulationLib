@@ -19,6 +19,8 @@ pub mod geometry;
 pub mod kinetics;
 pub mod photon;
 pub mod physics;
+#[cfg(feature = "preview")]
+pub mod preview;
 pub mod rng;
 pub mod svd;
 pub mod table;

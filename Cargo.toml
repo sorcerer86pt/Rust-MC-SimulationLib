@@ -24,6 +24,9 @@ rayon = { version = "1", optional = true }
 # quick-xml powers the optional `chain` feature: OpenMC chain.xml
 # parser for depletion / decay / fission-yield data.
 quick-xml = { version = "0.36", optional = true }
+# minifb powers the optional `preview` feature: cross-platform
+# pixel-buffer window for static geometry previews.
+minifb = { version = "0.27", optional = true }
 
 [features]
 # Default ships only the pure-math layer (svd, cp, ducru, cdf, rng).
@@ -41,6 +44,10 @@ parallel = ["dep:rayon"]
 # Bateman/CRAM solver are always available; only the XML loader is
 # gated.
 chain = ["dep:quick-xml"]
+# Static geometry previewer — opens a window and renders a top-down
+# CSG slice into it. Useful for sanity-checking a reactor or
+# shielding geometry before launching a full Monte Carlo run.
+preview = ["dep:minifb"]
 
 [dev-dependencies]
 # Add criterion later if we want benchmarks; keep deps minimal for now.
