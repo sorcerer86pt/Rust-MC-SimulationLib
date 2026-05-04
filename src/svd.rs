@@ -272,6 +272,21 @@ impl SvdKernel {
         }
     }
 
+    /// Alias for [`SvdKernel::from_factors`] kept for callers that
+    /// historically constructed kernels via `SvdKernel::new(...)`.
+    /// Same argument order, same semantics, no hash built.
+    #[inline]
+    pub fn new(
+        basis: Vec<f64>,
+        vt_coeffs: Vec<f64>,
+        row_axis: Arc<[f64]>,
+        rank: usize,
+        n_rows: usize,
+        n_cols: usize,
+    ) -> Self {
+        Self::from_factors(basis, vt_coeffs, row_axis, rank, n_rows, n_cols)
+    }
+
     /// Construct a kernel from already pre-multiplied basis + Vᵀ.
     /// Use this when you've serialised an SVD elsewhere or built
     /// the factors yourself.
@@ -511,6 +526,107 @@ impl SvdKernel {
     #[inline]
     pub fn reconstruct_single(&self, i: usize, coeffs: &[f64]) -> f64 {
         f64::exp2(self.reconstruct_at(i, coeffs) * std::f64::consts::LOG2_10)
+    }
+
+    /// Alias for [`SvdKernel::coeffs_at_col`] using temperature
+    /// terminology — same semantics, returned coefficients are
+    /// `Vᵀ[:, t]`.
+    #[inline]
+    pub fn temp_coeffs(&self, t: usize) -> Vec<f64> {
+        self.coeffs_at_col(t)
+    }
+
+    /// Alias for [`SvdKernel::ducru_coeffs`] using temperature
+    /// terminology — same semantics: Ducru-blended reconstruction
+    /// coefficients for an off-grid target column value.
+    #[inline]
+    pub fn temp_coeffs_ducru(&self, temperatures: &[f64], target_temp: f64) -> Vec<f64> {
+        self.ducru_coeffs(temperatures, target_temp)
+    }
+
+    /// Bytes of the shared row axis (count once per group of kernels
+    /// sharing the same axis, not once per kernel).
+    pub fn energy_grid_bytes(&self) -> usize {
+        self.row_axis.len() * std::mem::size_of::<f64>()
+    }
+
+    /// Return a new kernel restricted to rows **outside** the
+    /// closed interval `[lo, hi]`. Useful when a separate
+    /// representation handles the band (e.g. windowed multipole on a
+    /// resonance window): drop those rows from the SVD basis and
+    /// keep the smooth part.
+    ///
+    /// The `Vᵀ` matrix is unchanged because rows are indexed
+    /// independently of `Vᵀ`. The hash index is rebuilt as needed by
+    /// the caller.
+    pub fn trim_rows_outside(&self, lo: f64, hi: f64) -> Self {
+        let mut keep: Vec<usize> = Vec::with_capacity(self.n_rows);
+        for (i, &e) in self.row_axis.iter().enumerate() {
+            if e < lo || e > hi {
+                keep.push(i);
+            }
+        }
+        let new_n_rows = keep.len();
+        let mut new_axis: Vec<f64> = Vec::with_capacity(new_n_rows);
+        let mut new_basis: Vec<f64> = Vec::with_capacity(new_n_rows * self.rank);
+        for &i in &keep {
+            new_axis.push(self.row_axis[i]);
+            let row = &self.basis[i * self.rank..(i + 1) * self.rank];
+            new_basis.extend_from_slice(row);
+        }
+        Self {
+            basis: new_basis,
+            vt_coeffs: self.vt_coeffs.clone(),
+            row_axis: Arc::from(new_axis.into_boxed_slice()),
+            hash: None,
+            rank: self.rank,
+            n_rows: new_n_rows,
+            n_cols: self.n_cols,
+        }
+    }
+
+    /// Alias for [`SvdKernel::trim_rows_outside`] using
+    /// energy-window terminology.
+    #[inline]
+    pub fn trim_to_outside(&self, e_lo: f64, e_hi: f64) -> Self {
+        self.trim_rows_outside(e_lo, e_hi)
+    }
+
+    /// Alias for [`SvdKernel::reconstruct_full`] — full-row
+    /// reconstruction in the log domain (raw dot product per row).
+    /// Use this when the SVD was fit on `log10(σ)` data.
+    #[inline]
+    pub fn reconstruct_log(&self, coeffs: &[f64], out: &mut [f64]) {
+        self.reconstruct_full(coeffs, out);
+    }
+
+    /// Full-row reconstruction in linear domain: every row is
+    /// exponentiated as `10^row` after the dot product. Useful when
+    /// the SVD was fit on `log10(σ)`.
+    pub fn reconstruct_linear(&self, coeffs: &[f64], out: &mut [f64]) {
+        self.reconstruct_full(coeffs, out);
+        for v in out.iter_mut().take(self.n_rows) {
+            *v = f64::exp2(*v * std::f64::consts::LOG2_10);
+        }
+    }
+}
+
+/// SIMD-optimised full-row reconstruction via faer's matrix-vector
+/// multiply. Same numerical semantics as
+/// [`SvdKernel::reconstruct_full`]; the speed comes from faer's
+/// AVX2/AVX-512 dispatch on the underlying GEMV. Use this on long
+/// row axes (≥ 1000 rows) where the per-row dot product becomes
+/// the dominant cost.
+pub fn reconstruct_log_faer(kernel: &SvdKernel, coeffs: &[f64], out: &mut [f64]) {
+    use faer::Mat;
+    let n_rows = kernel.n_rows();
+    let rank = kernel.rank();
+    let basis = kernel.basis();
+    let basis_mat = Mat::from_fn(n_rows, rank, |i, j| basis[i * rank + j]);
+    let c = Mat::from_fn(rank, 1, |j, _| coeffs[j]);
+    let result = &basis_mat * &c;
+    for i in 0..n_rows {
+        out[i] = result[(i, 0)];
     }
 }
 
