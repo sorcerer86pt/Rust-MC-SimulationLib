@@ -184,13 +184,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     let inside_box = Region::Intersection(Box::new(between(2, 3)), Box::new(between(4, 5)));
-    let cell_fuel = Cell::new(CellId(0), inside(0), CellFill::Material(0));
-    let cell_clad = Cell::new(CellId(1), between(0, 1), CellFill::Material(1));
+    let cell_fuel = Cell::new(CellId(0), inside(0), CellFill::Material(0))
+        .with_aabb_from_region(&surfaces);
+    let cell_clad = Cell::new(CellId(1), between(0, 1), CellFill::Material(1))
+        .with_aabb_from_region(&surfaces);
     let cell_mod = Cell::new(
         CellId(2),
         Region::Intersection(Box::new(outside(1)), Box::new(inside_box)),
         CellFill::Material(2),
-    );
+    )
+    .with_aabb_from_region(&surfaces);
     let cells = vec![cell_fuel, cell_clad, cell_mod];
 
     // ── k-eigenvalue power iteration ────────────────────────────────
