@@ -155,7 +155,8 @@ fn main() {
 
     let _ = s_vessel_outer;
 
-    // 7) Render and show.
+    // 7) Render and show. The closure re-renders on resize / scroll /
+    // 'R' reset; first frame is the initial 1000 × 1000 view.
     let viewport = Viewport::square_centered(VESSEL_OUTER + 5.0, 0.0, 1000);
     let palette = MaterialPalette::default();
     println!(
@@ -163,27 +164,30 @@ fn main() {
         surfaces.len(),
         cells.len()
     );
-    let t0 = std::time::Instant::now();
-    let buffer = render_top_down(
-        &cells,
-        &surfaces,
-        |cell_idx| cell_materials[cell_idx],
-        &palette,
-        &viewport,
-    );
-    let elapsed = t0.elapsed().as_secs_f64();
     println!(
-        "rendered {}×{} px in {elapsed:.2} s ({:.1} Mpx/s)",
-        viewport.width,
-        viewport.height,
-        buffer.len() as f64 * 1.0e-6 / elapsed
+        "drag the window to zoom, scroll to zoom around centre, R to reset, Esc to close."
     );
-    println!("close the window or press Esc to exit");
     show_window(
-        &buffer,
-        viewport.width as usize,
-        viewport.height as usize,
+        viewport,
         "rust-mc-sim — French CP1 900 MWe core preview",
+        |vp| {
+            let t0 = std::time::Instant::now();
+            let buf = render_top_down(
+                &cells,
+                &surfaces,
+                |cell_idx| cell_materials[cell_idx],
+                &palette,
+                vp,
+            );
+            let dt = t0.elapsed().as_secs_f64();
+            println!(
+                "  rendered {}×{} px in {dt:.2} s ({:.1} Mpx/s)",
+                vp.width,
+                vp.height,
+                buf.len() as f64 * 1.0e-6 / dt.max(1.0e-9)
+            );
+            buf
+        },
     );
 }
 
