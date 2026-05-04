@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use crate::physics::angular::AngularDistribution;
 use crate::physics::spectra::EnergyDistribution;
+use crate::physics::thermal::ThermalScatterer;
 use crate::table::PointwiseTable;
 use crate::urr::UrrProbabilityTables;
 
@@ -69,6 +70,10 @@ pub struct Nuclide {
     pub inelastic_continuum_edist: Option<EnergyDistribution>,
     /// Unresolved Resonance Range probability tables.
     pub urr_tables: Option<UrrProbabilityTables>,
+    /// Optional bound-atom thermal-scattering kernel. When present,
+    /// the bound XS replaces free-atom elastic below
+    /// `kernel.energy_max()` (typically ~3.75 eV for H in H₂O).
+    pub thermal_scattering: Option<Arc<dyn ThermalScatterer>>,
 }
 
 impl Nuclide {
@@ -95,6 +100,7 @@ impl Nuclide {
             n3n_edist: None,
             inelastic_continuum_edist: None,
             urr_tables: None,
+            thermal_scattering: None,
         }
     }
 
@@ -103,6 +109,23 @@ impl Nuclide {
         self.nu_bar_table
             .as_ref()
             .map_or(self.nu_bar_const, |t| t.lookup(energy))
+    }
+
+    /// Temperature-aware micro-XS. Below the bound-atom kernel's
+    /// `energy_max`, the free-atom elastic channel is replaced by the
+    /// thermal-scattering total. Otherwise identical to
+    /// [`Self::micro_xs`].
+    pub fn micro_xs_at_temp(&self, energy: f64, temperature_k: f64) -> MicroXs {
+        let mut xs = self.micro_xs(energy);
+        if let Some(thermal) = &self.thermal_scattering {
+            if energy <= thermal.energy_max() {
+                let thermal_xs = thermal.total_xs(energy, temperature_k);
+                xs.total -= xs.elastic;
+                xs.elastic = thermal_xs;
+                xs.total += thermal_xs;
+            }
+        }
+        xs
     }
 
     /// Microscopic cross sections for all channels at `energy`. The
@@ -163,11 +186,13 @@ impl Material {
     }
 
     /// Macroscopic total cross section Σ_t at `energy`, in 1/cm.
-    /// `Σ = Σ_n N_n · σ_t,n(E)` summed across nuclides.
+    /// `Σ = Σ_n N_n · σ_t,n(E)` summed across nuclides, with bound
+    /// thermal kernels (when present on a nuclide) replacing the
+    /// free-atom elastic channel below their `energy_max`.
     pub fn macro_total(&self, energy: f64) -> f64 {
         self.nuclides
             .iter()
-            .map(|(n, density)| density * n.micro_xs(energy).total)
+            .map(|(n, density)| density * n.micro_xs_at_temp(energy, self.temperature_k).total)
             .sum()
     }
 

@@ -15,6 +15,7 @@
 //! constructing an SVD/Ducru reconstruction stack themselves.
 
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::error::{NuclearError, NuclearResult};
 use crate::nuclear_hdf5::{
@@ -259,6 +260,26 @@ fn convert_urr(src: HdfUrr) -> UrrProbabilityTables {
         multiply_smooth: src.multiply_smooth,
         interpolation: src.interpolation,
     }
+}
+
+/// Load an OpenMC thermal-scattering HDF5 file (e.g. `c_H_in_H2O.h5`)
+/// and return it as an `Arc<dyn ThermalScatterer>` ready to attach to
+/// a `Nuclide` via [`attach_thermal_scattering`].
+pub fn load_thermal_scattering(
+    path: &Path,
+) -> NuclearResult<Arc<dyn crate::physics::thermal::ThermalScatterer>> {
+    let data = hdf5_reader::load_thermal_scattering(path)?;
+    Ok(Arc::new(data))
+}
+
+/// Convenience: bolt an already-loaded thermal kernel onto an
+/// already-loaded `Nuclide`. Returns the same nuclide for chaining.
+pub fn attach_thermal_scattering(
+    mut nuclide: Nuclide,
+    kernel: Arc<dyn crate::physics::thermal::ThermalScatterer>,
+) -> Nuclide {
+    nuclide.thermal_scattering = Some(kernel);
+    nuclide
 }
 
 /// Recover a clean nuclide name from a path like

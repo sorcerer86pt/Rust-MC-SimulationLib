@@ -4,3 +4,4 @@
 pub mod angular;
 pub mod scatter;
 pub mod spectra;
+pub mod thermal;

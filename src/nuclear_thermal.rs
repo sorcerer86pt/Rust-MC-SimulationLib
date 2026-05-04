@@ -136,6 +136,52 @@ pub enum ElasticThermal {
     },
 }
 
+// Implement the engine-facing trait. Below `energy_max`, the
+// bound-atom kernel replaces the free-atom elastic channel for any
+// nuclide that carries an `Arc<dyn ThermalScatterer>` reference.
+impl crate::physics::thermal::ThermalScatterer for ThermalScatteringData {
+    fn energy_max(&self) -> f64 {
+        self.energy_max
+    }
+
+    fn total_xs(&self, energy: f64, temperature_k: f64) -> f64 {
+        if energy > self.energy_max {
+            return 0.0;
+        }
+        let temp_idx = nearest_temperature_index(&self.kts, temperature_k);
+        ThermalScatteringData::total_xs(self, energy, temp_idx)
+    }
+
+    fn sample(
+        &self,
+        energy: f64,
+        temperature_k: f64,
+        rng: &mut Rng,
+    ) -> (f64, f64) {
+        let xi_t = rng.uniform();
+        let temp_idx = self.select_temperature(temperature_k, xi_t);
+        ThermalScatteringData::sample(self, energy, temp_idx, rng)
+    }
+}
+
+fn nearest_temperature_index(kts: &[f64], temperature_k: f64) -> usize {
+    if kts.is_empty() {
+        return 0;
+    }
+    let k_boltzmann = 8.617_333_262e-5_f64;
+    let kt = temperature_k * k_boltzmann;
+    let mut best = 0;
+    let mut best_d = (kts[0] - kt).abs();
+    for (i, &v) in kts.iter().enumerate().skip(1) {
+        let d = (v - kt).abs();
+        if d < best_d {
+            best = i;
+            best_d = d;
+        }
+    }
+    best
+}
+
 // ── Cross Section Evaluation ───────────────────────────────────────────
 
 impl ThermalScatteringData {

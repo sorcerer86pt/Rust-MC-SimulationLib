@@ -21,8 +21,9 @@
 //! Nine nuclides loaded with energy-dependent ν̄, fission outgoing-
 //! energy distributions, elastic CM angular distributions, URR
 //! probability tables, and discrete inelastic levels. S(α,β) thermal
-//! scattering for H in H₂O is *not* included in this example; for
-//! that, layer in the `nuclear::thermal` module.
+//! scattering for H in H₂O is loaded from `c_H_in_H2O.h5` and
+//! attached to the H-1 nuclide in the moderator material — the
+//! bound kernel takes over below ~3.75 eV.
 //!
 //! Run with:
 //!
@@ -43,7 +44,10 @@ use std::time::Instant;
 use rust_mc_sim::geometry::cell::{Cell, CellFill, CellId, Region, between, inside, outside};
 use rust_mc_sim::geometry::surface::BoundaryCondition;
 use rust_mc_sim::geometry::Surface;
-use rust_mc_sim::nuclear::loader::{LoaderConfig, load_nuclide_from_hdf5};
+use rust_mc_sim::nuclear::loader::{
+    LoaderConfig, attach_thermal_scattering, load_nuclide_from_hdf5,
+    load_thermal_scattering,
+};
 use rust_mc_sim::transport::material::{Material, Nuclide};
 use rust_mc_sim::transport::simulate::{EigenvalueConfig, run_eigenvalue};
 
@@ -105,7 +109,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let u235 = Arc::new(load("U235", &data_dir, T_FUEL, &cfg)?);
     let u238 = Arc::new(load("U238", &data_dir, T_FUEL, &cfg)?);
     let o16_fuel = Arc::new(load("O16", &data_dir, T_FUEL, &cfg)?);
-    let h1 = Arc::new(load("H1", &data_dir, T_MOD, &cfg)?);
+    // H-1 in water gets the c_H_in_H2O S(α,β) kernel attached. Below
+    // its energy_max (~3.75 eV) the bound XS takes over from free
+    // elastic — this is the classic ~300 pcm correction on PWR k_∞.
+    let h1_free = load("H1", &data_dir, T_MOD, &cfg)?;
+    let sab_path = data_dir.join("c_H_in_H2O.h5");
+    let h1 = match load_thermal_scattering(&sab_path) {
+        Ok(kernel) => {
+            println!("attached S(α,β) kernel from {}", sab_path.display());
+            Arc::new(attach_thermal_scattering(h1_free, kernel))
+        }
+        Err(e) => {
+            eprintln!(
+                "warning: c_H_in_H2O.h5 not found ({e}); running without S(α,β)"
+            );
+            Arc::new(h1_free)
+        }
+    };
     let o16_mod = Arc::new(load("O16", &data_dir, T_MOD, &cfg)?);
     let zr90 = Arc::new(load("Zr90", &data_dir, T_CLAD, &cfg)?);
     let zr91 = Arc::new(load("Zr91", &data_dir, T_CLAD, &cfg)?);

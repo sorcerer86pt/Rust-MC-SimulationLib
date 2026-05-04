@@ -2548,10 +2548,6 @@ pub fn load_thermal_scattering(path: &Path) -> Result<ThermalScatteringData> {
         _ => vec![],
     };
 
-    println!(
-        "  Thermal: {name}  nuclides={nuclides:?}  energy_max={energy_max:.2} eV  AWR={awr:.3}"
-    );
-
     // Read temperatures from kTs group
     let kts_group = g.group("kTs").map_err(|e| SvdError::Hdf5 {
         path: path.display().to_string(),
@@ -2664,8 +2660,6 @@ fn read_thermal_inelastic(
         read_continuous_inelastic_dist(&dist_group, path)?
     };
 
-    println!("    {temp_label} inelastic: {n_e} energies, type={dist_type}");
-
     Ok(InelasticThermal { energy, xs, dist })
 }
 
@@ -2750,8 +2744,6 @@ fn read_continuous_inelastic_dist(group: &hdf5_pure::Group, path: &Path) -> Resu
     let mu = mu_raw[..n_mu_total].to_vec();
     let pdf_mu = mu_raw[n_mu_total..2 * n_mu_total].to_vec();
     let cdf_mu = mu_raw[2 * n_mu_total..3 * n_mu_total].to_vec();
-
-    println!("    Continuous: {n_inc} inc energies, {n_total} E_out pts, {n_mu_total} mu pts");
 
     Ok(InelasticDist::Continuous(ContinuousInelastic {
         n_inc,

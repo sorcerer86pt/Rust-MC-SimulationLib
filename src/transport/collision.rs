@@ -2,7 +2,7 @@
 //! kinematics routine → update the particle.
 
 use crate::physics::scatter::{
-    elastic_scatter, elastic_scatter_aniso, inelastic_scatter,
+    elastic_scatter, elastic_scatter_aniso, inelastic_scatter, rotate_direction,
 };
 use crate::physics::spectra::evaporation;
 use crate::rng::Pcg64;
@@ -48,10 +48,11 @@ pub fn sample_nuclide_at_energy(
     rng: &mut Pcg64,
 ) -> Option<(usize, MicroXs)> {
     let mut cum_total = 0.0_f64;
+    let temperature_k = material.temperature_k;
     let nuclide_xs: Vec<MicroXs> = material
         .nuclides
         .iter()
-        .map(|(n, _)| n.micro_xs(energy))
+        .map(|(n, _)| n.micro_xs_at_temp(energy, temperature_k))
         .collect();
     let total: f64 = material
         .nuclides
@@ -93,6 +94,16 @@ pub fn process_collision(
 
     cum += xs.elastic;
     if xi < cum {
+        // Bound-atom thermal kernel takes over below energy_max.
+        if let Some(thermal) = &nuclide.thermal_scattering {
+            if particle.energy <= thermal.energy_max() {
+                let (e_out, mu_lab) =
+                    thermal.sample(particle.energy, temperature_k, rng);
+                particle.dir = rotate_direction(particle.dir, mu_lab, rng);
+                particle.energy = e_out.max(1e-5);
+                return CollisionOutcome::Scatter;
+            }
+        }
         let (e, d) = elastic_scatter_aniso(
             particle.energy,
             particle.dir,
