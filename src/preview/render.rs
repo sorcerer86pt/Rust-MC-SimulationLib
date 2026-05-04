@@ -38,6 +38,107 @@ impl LegendEntry {
     }
 }
 
+/// Heuristic colour for a material based on its name. Returns
+/// `None` when no keyword matches; the caller is expected to fall
+/// back to a default-palette colour.
+///
+/// Keyword groups (most-specific first — the first match wins):
+///
+///   * heavy water / D₂O / D2O                → darker blue
+///   * light water / H₂O / H2O / "water"      → cool blue
+///   * MOX / plutonium / PuO₂                 → bright orange
+///   * UO₂ / uranium / "fuel" (+ burn-up tag) → fresh red / mid orange / burnt purple
+///   * zircaloy / clad / "Zr "                → light grey
+///   * steel / SS / vessel / barrel / iron    → darker grey
+///   * concrete                               → tan
+///   * control / RCCA / B₄C / B4C / AIC / absorber → yellow
+///   * boron / boric / B10                    → yellow-orange
+///   * lead-bismuth / LBE / PbBi              → dark teal-grey
+///   * lead / Pb                              → dark slate
+///   * graphite / carbon                      → near-black grey
+///   * sodium / Na coolant                    → silver
+///   * helium / CO₂ / gas                     → very light cyan
+///   * polyethylene / CH₂ / paraffin          → pale pink
+///   * air / void / vacuum                    → near-black
+///   * reflector                              → green
+///   * moderator                              → light blue
+pub fn auto_color_from_name(name: &str) -> Option<[u8; 3]> {
+    let n = name.to_lowercase();
+    let any = |needles: &[&str]| needles.iter().any(|k| n.contains(k));
+
+    if any(&["heavy water", "d2o", "d₂o"]) {
+        return Some([40, 80, 180]);
+    }
+    if any(&["light water", "h2o", "h₂o"]) || (n.contains("water") && !n.contains("heavy")) {
+        return Some([80, 150, 230]);
+    }
+    if any(&["mox", "plutonium", "puo2", "puo₂"]) {
+        return Some([240, 140, 50]);
+    }
+    // Fuel-burnup keywords work even without an explicit "fuel"
+    // word — reload patterns commonly say just "first / second /
+    // third cycle" or "fresh / mid / burnt".
+    let is_fuel_keyword =
+        any(&["uo2", "uo₂", "uranium", "fuel", "first cycle", "1st cycle",
+              "second cycle", "2nd cycle", "third cycle", "3rd cycle",
+              "boc", "eoc", "fresh", "mid-core", "mid core"]);
+    if is_fuel_keyword {
+        if any(&["burnt", "depleted", "spent", "third", "3rd cycle", "eoc"]) {
+            return Some([120, 60, 80]); // burnt — purple-red
+        }
+        if any(&["mid", "second", "2nd"]) {
+            return Some([220, 120, 60]); // mid-cycle — orange
+        }
+        return Some([200, 80, 60]); // fresh — red
+    }
+    if any(&["zircaloy", "clad", "zr "]) || n == "zr" {
+        return Some([170, 170, 170]);
+    }
+    if any(&["steel", "vessel", "barrel", "iron"]) || n.split_whitespace().any(|w| w == "ss") {
+        return Some([110, 110, 120]);
+    }
+    if n.contains("concrete") {
+        return Some([180, 160, 120]);
+    }
+    if any(&["control", "rcca", "b4c", "b₄c", "aic", "absorber"]) {
+        return Some([255, 220, 60]);
+    }
+    if any(&["boron", "boric", "b10", "b-10"]) {
+        return Some([255, 200, 80]);
+    }
+    if any(&["lead-bismuth", "lbe", "pbbi", "pb-bi"]) {
+        return Some([60, 80, 100]);
+    }
+    if n.contains("lead")
+        || n.split_whitespace().any(|w| w == "pb")
+        || n.starts_with("pb ")
+    {
+        return Some([70, 70, 90]);
+    }
+    if any(&["graphite", "carbon"]) {
+        return Some([60, 60, 60]);
+    }
+    if any(&["sodium", "na coolant"]) || n.split_whitespace().any(|w| w == "na") {
+        return Some([200, 200, 220]);
+    }
+    if any(&["helium", "co2", "co₂", " gas"]) || n == "gas" {
+        return Some([210, 240, 250]);
+    }
+    if any(&["polyethylene", "ch2", "ch₂", "paraffin"]) {
+        return Some([240, 200, 210]);
+    }
+    if any(&["air", "void", "vacuum"]) {
+        return Some([30, 30, 35]);
+    }
+    if n.contains("reflector") {
+        return Some([60, 180, 100]);
+    }
+    if n.contains("moderator") {
+        return Some([60, 180, 220]);
+    }
+    None
+}
+
 /// Build a legend from a list of materials and a palette. Material
 /// at index `i` is paired with `palette.colors[i]` (or `palette.void`
 /// for indices past the palette).
@@ -61,6 +162,11 @@ pub fn legend_from_materials<M: NamedMaterial>(
 /// One-shot OpenMC-style preview: open a window, render the geometry
 /// top-down, derive the legend from the supplied materials list.
 /// Wraps [`show_window`] + [`render_top_down`] + [`legend_from_materials`].
+///
+/// Pass `palette = None` to auto-derive colours from each material's
+/// name via [`MaterialPalette::for_materials`]: light water becomes
+/// blue, fresh fuel red, MOX orange, lead dark, and so on. Pass an
+/// explicit [`MaterialPalette`] to override.
 pub fn preview_geometry<M: NamedMaterial>(
     initial: Viewport,
     title: &str,
@@ -70,7 +176,7 @@ pub fn preview_geometry<M: NamedMaterial>(
     cell_to_material: impl Fn(usize) -> usize + Sync,
     palette: Option<MaterialPalette>,
 ) {
-    let palette = palette.unwrap_or_default();
+    let palette = palette.unwrap_or_else(|| MaterialPalette::for_materials(materials));
     let legend = legend_from_materials(materials, &palette);
     show_window(initial, title, legend, |vp| {
         render_top_down(cells, surfaces, &cell_to_material, &palette, vp)
@@ -136,6 +242,30 @@ impl Default for MaterialPalette {
     }
 }
 
+impl MaterialPalette {
+    /// Build a palette by looking up each material's name through
+    /// [`auto_color_from_name`]. Materials whose names don't match
+    /// any keyword fall back to the index-based [`Default`] palette,
+    /// so the result still has a colour at every index.
+    pub fn for_materials<M: NamedMaterial>(materials: &[M]) -> Self {
+        let fallback = Self::default();
+        let colors: Vec<[u8; 3]> = materials
+            .iter()
+            .enumerate()
+            .map(|(i, m)| {
+                auto_color_from_name(m.name())
+                    .unwrap_or_else(|| {
+                        fallback.colors.get(i).copied().unwrap_or(fallback.void)
+                    })
+            })
+            .collect();
+        Self {
+            colors,
+            void: fallback.void,
+        }
+    }
+}
+
 /// Render a top-down CSG slice into a flat `u32` framebuffer in
 /// `0x00RRGGBB` (minifb-native) format. Caller decides what to do
 /// with it — pass to [`show_window`], save to PNG via the user's
@@ -175,6 +305,76 @@ pub fn render_top_down(
 #[inline]
 fn pack_rgb([r, g, b]: [u8; 3]) -> u32 {
     ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn approx_color(c: Option<[u8; 3]>, expected: [u8; 3]) {
+        assert_eq!(c, Some(expected));
+    }
+
+    #[test]
+    fn light_water_is_cool_blue() {
+        approx_color(auto_color_from_name("light water moderator"), [80, 150, 230]);
+        approx_color(auto_color_from_name("H2O"), [80, 150, 230]);
+        approx_color(auto_color_from_name("H₂O at 583 K"), [80, 150, 230]);
+    }
+
+    #[test]
+    fn heavy_water_is_darker_blue() {
+        approx_color(auto_color_from_name("heavy water"), [40, 80, 180]);
+        approx_color(auto_color_from_name("D2O"), [40, 80, 180]);
+        approx_color(auto_color_from_name("D₂O coolant"), [40, 80, 180]);
+    }
+
+    #[test]
+    fn fuel_keywords_split_by_burnup() {
+        approx_color(
+            auto_color_from_name("UO₂ fuel (fresh, 3.7 % ²³⁵U)"),
+            [200, 80, 60],
+        );
+        approx_color(
+            auto_color_from_name("second cycle (mid-core)"),
+            [220, 120, 60],
+        );
+        approx_color(
+            auto_color_from_name("third cycle (periphery)"),
+            [120, 60, 80],
+        );
+    }
+
+    #[test]
+    fn mox_distinct_from_uo2() {
+        approx_color(auto_color_from_name("MOX fuel 7 % Pu"), [240, 140, 50]);
+    }
+
+    #[test]
+    fn structural_materials() {
+        approx_color(auto_color_from_name("Zircaloy-4 clad"), [170, 170, 170]);
+        approx_color(
+            auto_color_from_name("steel core barrel + pressure vessel"),
+            [110, 110, 120],
+        );
+        approx_color(auto_color_from_name("biological concrete"), [180, 160, 120]);
+    }
+
+    #[test]
+    fn absorbers_and_lead() {
+        approx_color(
+            auto_color_from_name("RCCA control cluster (B₄C / AIC)"),
+            [255, 220, 60],
+        );
+        approx_color(auto_color_from_name("lead shielding"), [70, 70, 90]);
+        approx_color(auto_color_from_name("Pb-Bi eutectic"), [60, 80, 100]);
+    }
+
+    #[test]
+    fn unknown_name_returns_none() {
+        assert!(auto_color_from_name("Unobtainium-235").is_none());
+        assert!(auto_color_from_name("frobnicator").is_none());
+    }
 }
 
 /// Open a minifb window with the given initial `viewport` and let

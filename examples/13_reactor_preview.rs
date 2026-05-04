@@ -20,7 +20,7 @@ use std::sync::Arc;
 use rust_mc_sim::geometry::cell::{Cell, CellFill, CellId, Region, between, inside, outside};
 use rust_mc_sim::geometry::surface::BoundaryCondition;
 use rust_mc_sim::geometry::Surface;
-use rust_mc_sim::preview::{MaterialPalette, Viewport, preview_geometry};
+use rust_mc_sim::preview::{Viewport, preview_geometry};
 use rust_mc_sim::transport::material::{Material, Nuclide};
 
 // ── Material indices into the user's material list. The previewer
@@ -158,7 +158,7 @@ fn main() {
         &surfaces,
         &materials,
         |cell_idx| cell_materials[cell_idx],
-        Some(MaterialPalette::default()),
+        None, // auto-derive colours from material names
     );
 }
 

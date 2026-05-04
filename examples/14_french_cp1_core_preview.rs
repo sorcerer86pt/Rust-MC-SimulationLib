@@ -22,7 +22,7 @@
 use rust_mc_sim::geometry::cell::{Cell, CellFill, CellId, between, inside};
 use rust_mc_sim::geometry::surface::BoundaryCondition;
 use rust_mc_sim::geometry::Surface;
-use rust_mc_sim::preview::{MaterialPalette, Viewport, preview_geometry};
+use rust_mc_sim::preview::{Viewport, preview_geometry};
 use rust_mc_sim::transport::material::Material;
 
 // ── Plant geometry (cm) ─────────────────────────────────────────────
@@ -159,7 +159,7 @@ fn main() {
         &surfaces,
         &materials,
         |cell_idx| cell_materials[cell_idx],
-        Some(MaterialPalette::default()),
+        None, // auto-derive colours from material names
     );
 }
 
