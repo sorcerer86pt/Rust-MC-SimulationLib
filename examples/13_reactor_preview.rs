@@ -180,7 +180,9 @@ fn main() {
 
     // 7) Render and show. The closure is re-invoked on every
     // resize / scroll-zoom / `R` reset.
-    let viewport = Viewport::square_centered(VESSEL_OUTER + 1.0, 0.0, 900);
+    // 25 % margin so non-square window resizes keep the vessel ring
+    // fully on-screen.
+    let viewport = Viewport::square_centered(VESSEL_OUTER * 1.25, 0.0, 900);
     let palette = MaterialPalette::default();
     println!(
         "{} surfaces, {} cells. drag the window to zoom, scroll to zoom around centre, R to reset, Esc to close.",

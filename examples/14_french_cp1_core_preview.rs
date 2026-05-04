@@ -157,7 +157,9 @@ fn main() {
 
     // 7) Render and show. The closure re-renders on resize / scroll /
     // 'R' reset; first frame is the initial 1000 × 1000 view.
-    let viewport = Viewport::square_centered(VESSEL_OUTER + 5.0, 0.0, 1000);
+    // Margin = 25 % of the vessel outer radius so non-square window
+    // resizes keep the vessel ring fully on-screen.
+    let viewport = Viewport::square_centered(VESSEL_OUTER * 1.25, 0.0, 1000);
     let palette = MaterialPalette::default();
     println!(
         "CP1-class core: {assembly_count} assemblies, {} surfaces, {} cells",
