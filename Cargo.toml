@@ -2,7 +2,7 @@
 name = "rust-mc-sim"
 version = "0.1.0"
 edition = "2024"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 description = "Reusable building blocks for Monte Carlo simulation in Rust: SVD/CP-PARAFAC tensor compression, Ducru off-grid reconstruction, log-decimated CDF inverse-transform sampling, PCG-64 RNG, and (optionally) the OpenMC nuclear-data layer (HDF5 reader, Windowed Multipole, S(α,β)). Extracted from open_rust_mc, validated end-to-end against OpenMC 0.15.3."
 repository = "https://github.com/sorcerer86pt/Rust-MC-SimulationLib"
 homepage = "https://github.com/sorcerer86pt/Rust-MC-SimulationLib"
