@@ -456,6 +456,62 @@ impl SvdKernel {
     pub fn memory_bytes(&self) -> usize {
         (self.basis.len() + self.vt_coeffs.len()) * std::mem::size_of::<f64>()
     }
+
+    // ── Aliases for callers using nuclear-physics naming ──────────────
+    //
+    // The parent project (`open_rust_mc`) treats the row axis as
+    // *energy* and the column axis as *temperature* and stores
+    // `log10(σ)` in the matrix. The aliases below keep the
+    // domain-specific names callable without forcing those callers
+    // to rewrite every site to the generic name.
+
+    /// Alias for [`SvdKernel::n_rows`] — number of energy points
+    /// when the row axis represents energy.
+    #[inline]
+    pub fn n_energy(&self) -> usize {
+        self.n_rows
+    }
+
+    /// Alias for [`SvdKernel::row_axis`] — the energy grid when the
+    /// row axis represents energy.
+    #[inline]
+    pub fn energies(&self) -> &[f64] {
+        &self.row_axis
+    }
+
+    /// Alias for [`SvdKernel::row_index`] — index lookup when the
+    /// row axis represents energy.
+    #[inline]
+    pub fn energy_index(&self, energy: f64) -> usize {
+        self.row_index(energy)
+    }
+
+    /// Alias for [`SvdKernel::basis`] — kept for consumers that
+    /// historically called the f64 basis explicitly.
+    #[inline]
+    pub fn basis_f64(&self) -> &[f64] {
+        &self.basis
+    }
+
+    /// Reconstruct one row at row index `i` using the supplied
+    /// length-`rank` coefficients (raw dot product of `basis[i,:]`
+    /// against `coeffs`).
+    ///
+    /// When the SVD was fit on `log10(σ)` data this returns the
+    /// log-domain value; pair with [`SvdKernel::reconstruct_single`]
+    /// for the linear-domain (exponentiated) value.
+    #[inline]
+    pub fn reconstruct_single_log(&self, i: usize, coeffs: &[f64]) -> f64 {
+        self.reconstruct_at(i, coeffs)
+    }
+
+    /// Reconstruct one row at row index `i` and exponentiate the
+    /// log-domain value back to linear scale: `10^reconstruct_at(...)`.
+    /// Useful when the SVD was fit on `log10(σ)`.
+    #[inline]
+    pub fn reconstruct_single(&self, i: usize, coeffs: &[f64]) -> f64 {
+        f64::exp2(self.reconstruct_at(i, coeffs) * std::f64::consts::LOG2_10)
+    }
 }
 
 #[cfg(test)]
