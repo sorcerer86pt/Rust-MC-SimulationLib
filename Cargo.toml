@@ -1,15 +1,15 @@
 [package]
-name = "tensor-compress"
+name = "rust-mc-sim"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-description = "Low-rank approximations of multi-way tabulated data: truncated SVD with Ducru-weighted off-grid reconstruction, CP/PARAFAC for 3-tensors, and log-decimated CDF sampling. Extracted from open_rust_mc, generalised for non-nuclear use."
-repository = "https://github.com/sorcerer86pt/tensor-compress-rs"
-homepage = "https://github.com/sorcerer86pt/tensor-compress-rs"
-documentation = "https://docs.rs/tensor-compress"
+description = "Reusable building blocks for Monte Carlo simulation in Rust: SVD/CP-PARAFAC tensor compression, Ducru off-grid reconstruction, log-decimated CDF inverse-transform sampling, PCG-64 RNG, and (optionally) the OpenMC nuclear-data layer (HDF5 reader, Windowed Multipole, S(α,β)). Extracted from open_rust_mc, validated end-to-end against OpenMC 0.15.3."
+repository = "https://github.com/sorcerer86pt/Rust-MC-SimulationLib"
+homepage = "https://github.com/sorcerer86pt/Rust-MC-SimulationLib"
+documentation = "https://docs.rs/rust-mc-sim"
 readme = "README.md"
-keywords = ["svd", "tensor", "parafac", "decomposition", "compression"]
-categories = ["mathematics", "science", "compression"]
+keywords = ["monte-carlo", "svd", "parafac", "nuclear", "simulation"]
+categories = ["mathematics", "science", "simulation"]
 
 [dependencies]
 faer = "0.22"
@@ -17,15 +17,22 @@ faer = "0.22"
 # HDF5 reader, WMP loader, S(α,β) loader. Pure-math callers don't pay
 # for it.
 hdf5-pure = { version = "0.1", optional = true }
+# rayon powers the optional `parallel` feature: batch APIs that fan
+# out across cores for at-scale loads (200k-nuclide depletion-style
+# libraries, large CP-decomposition sweeps, etc.).
+rayon = { version = "1", optional = true }
 
 [features]
-# Default ships only the pure-math layer (svd, cp, ducru, cdf).
+# Default ships only the pure-math layer (svd, cp, ducru, cdf, rng).
 default = []
-# Bundles the nuclear-data layer extracted from open_rust_mc:
-# windowed multipole + Humlicek W4 Faddeeva, S(α,β) thermal kernels,
-# OpenMC HDF5 reader. All gated behind one feature flag so callers
-# who only want the math compress to a thin dep tree.
+# Nuclear-data layer extracted from open_rust_mc: WMP + Humlicek W4
+# Faddeeva, S(α,β) thermal kernels, OpenMC HDF5 reader. Gated behind
+# one feature so pure-math callers get a thin dep tree.
 nuclear = ["dep:hdf5-pure"]
+# Parallel batch APIs: `decompose_many_par`, `cp_many_par`, etc.
+# Only useful when you have many independent decompositions/loads.
+# Sequential APIs are always available regardless of this flag.
+parallel = ["dep:rayon"]
 
 [dev-dependencies]
 # Add criterion later if we want benchmarks; keep deps minimal for now.

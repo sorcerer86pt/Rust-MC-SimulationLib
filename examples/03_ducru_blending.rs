@@ -8,7 +8,7 @@
 //!
 //! Run with: `cargo run --release --example 03_ducru_blending`
 
-use tensor_compress::{ducru_unity_weights, ducru_weights, nearest_k_columns};
+use rust_mc_sim::{ducru_unity_weights, ducru_weights, nearest_k_columns};
 
 fn main() {
     let library = vec![300.0, 600.0, 900.0, 1200.0, 1500.0, 2500.0];

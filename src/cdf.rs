@@ -30,7 +30,7 @@
 //! # Quick example
 //!
 //! ```
-//! use tensor_compress::cdf::LogDecimatedCdf;
+//! use rust_mc_sim::cdf::LogDecimatedCdf;
 //! // Three categories whose probabilities depend on x ∈ [1, 100].
 //! // Simple smooth shapes for illustration.
 //! let xs: Vec<f64> = (0..50).map(|i| 1.0 * 1.1f64.powi(i)).collect();

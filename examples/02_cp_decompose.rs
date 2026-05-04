@@ -5,7 +5,7 @@
 //!
 //! Run with: `cargo run --release --example 02_cp_decompose`
 
-use tensor_compress::{cp_greedy_rank1, max_abs_error, relative_l2_error};
+use rust_mc_sim::{cp_greedy_rank1, max_abs_error, relative_l2_error};
 
 fn main() {
     // A 3-tensor with three distinguishable components: a smooth

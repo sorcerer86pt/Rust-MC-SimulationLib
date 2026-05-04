@@ -289,20 +289,43 @@ impl SvdKernel {
     ) -> Self {
         assert_eq!(basis.len(), n_rows * rank);
         assert_eq!(vt_coeffs.len(), rank * n_cols);
-        let hash = if n_rows > 100 {
-            Some(LogHashIndex::new(&row_axis, 8192))
-        } else {
-            None
-        };
+        // No hash by default — at 200k-kernel scale a 32 KB hash per
+        // kernel costs ~6.4 GB. Call `build_hash` selectively for
+        // hot kernels, or load via `from_data` (which builds a hash
+        // when n_rows > 100).
         Self {
             basis,
             vt_coeffs,
             row_axis,
-            hash,
+            hash: None,
             rank,
             n_rows,
             n_cols,
         }
+    }
+
+    /// Build (or rebuild) the [`LogHashIndex`] for O(1) row lookups.
+    /// `n_bins = 8192` is a good default for axes with $\sim10^4$
+    /// entries; higher gives shorter scan tails at the cost of more
+    /// memory (4 bytes per bin).
+    ///
+    /// At the 200k-kernel scale you typically only want this on the
+    /// few percent of kernels in the hot path of your transport loop;
+    /// the rest get the binary-search fallback for free and save the
+    /// 32 KB / kernel hash budget.
+    pub fn build_hash(&mut self, n_bins: usize) {
+        self.hash = Some(LogHashIndex::new(&self.row_axis, n_bins));
+    }
+
+    /// Drop the hash index (free its memory). The kernel falls back
+    /// to binary search on subsequent `row_index` calls.
+    pub fn drop_hash(&mut self) {
+        self.hash = None;
+    }
+
+    /// Whether the hash index is currently built.
+    pub fn has_hash(&self) -> bool {
+        self.hash.is_some()
     }
 
     pub fn rank(&self) -> usize {

@@ -1,4 +1,4 @@
-//! `tensor-compress` — low-rank approximations for tabulated
+//! `rust-mc-sim` — low-rank approximations for tabulated
 //! multi-way data, with a (feature-gated) OpenMC-compatible
 //! nuclear-data layer.
 //!
@@ -38,8 +38,9 @@
 //!
 //! For convenience, the pure-math types are re-exported at the
 //! crate root so the typical caller can write
-//! `use tensor_compress::{SvdKernel, ducru_unity_weights};`.
+//! `use rust_mc_sim::{SvdKernel, ducru_unity_weights};`.
 
+pub mod batch;
 pub mod cdf;
 pub mod cp;
 pub mod ducru;

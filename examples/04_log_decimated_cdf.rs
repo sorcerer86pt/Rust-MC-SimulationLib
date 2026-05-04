@@ -3,7 +3,7 @@
 //!
 //! Run with: `cargo run --release --example 04_log_decimated_cdf`
 
-use tensor_compress::{Pcg64, cdf::LogDecimatedCdf};
+use rust_mc_sim::{Pcg64, cdf::LogDecimatedCdf};
 
 fn main() {
     // Three categories with intensities that depend on `x`.

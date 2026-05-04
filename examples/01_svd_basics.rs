@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use tensor_compress::{SvdKernel, ducru_unity_weights, nearest_k_columns};
+use rust_mc_sim::{SvdKernel, ducru_unity_weights, nearest_k_columns};
 
 fn main() {
     // Smooth function f(x, t) = sin(x) · exp(-t / 1000) sampled on a
