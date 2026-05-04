@@ -21,6 +21,9 @@ hdf5-pure = { version = "0.1", optional = true }
 # out across cores for at-scale loads (200k-nuclide depletion-style
 # libraries, large CP-decomposition sweeps, etc.).
 rayon = { version = "1", optional = true }
+# quick-xml powers the optional `chain` feature: OpenMC chain.xml
+# parser for depletion / decay / fission-yield data.
+quick-xml = { version = "0.36", optional = true }
 
 [features]
 # Default ships only the pure-math layer (svd, cp, ducru, cdf, rng).
@@ -33,6 +36,11 @@ nuclear = ["dep:hdf5-pure"]
 # Only useful when you have many independent decompositions/loads.
 # Sequential APIs are always available regardless of this flag.
 parallel = ["dep:rayon"]
+# OpenMC chain.xml parser for `decay::chain` + `fission_yields`.
+# In-memory `DecayChain` data structures and the `depletion::bateman`
+# Bateman/CRAM solver are always available; only the XML loader is
+# gated.
+chain = ["dep:quick-xml"]
 
 [dev-dependencies]
 # Add criterion later if we want benchmarks; keep deps minimal for now.

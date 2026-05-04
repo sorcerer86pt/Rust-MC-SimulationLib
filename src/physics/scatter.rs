@@ -5,62 +5,12 @@
 use crate::physics::angular::AngularDistribution;
 use crate::rng::Pcg64;
 
+// Re-export the canonical Vec3 from `geometry` so callers using
+// scatter's old path keep working.
+pub use crate::geometry::Vec3;
+
 /// Boltzmann constant in eV/K (OpenMC value).
 pub const K_BOLTZMANN: f64 = 8.617_333e-5;
-
-/// Three-component direction / velocity vector.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Vec3 {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
-}
-
-impl Vec3 {
-    #[inline]
-    pub const fn new(x: f64, y: f64, z: f64) -> Self {
-        Self { x, y, z }
-    }
-
-    #[inline]
-    pub fn length(self) -> f64 {
-        (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
-    }
-
-    #[inline]
-    pub fn normalized(self) -> Self {
-        let l = self.length();
-        if l > 0.0 {
-            Self::new(self.x / l, self.y / l, self.z / l)
-        } else {
-            self
-        }
-    }
-}
-
-impl std::ops::Add for Vec3 {
-    type Output = Self;
-    #[inline]
-    fn add(self, rhs: Self) -> Self {
-        Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
-    }
-}
-
-impl std::ops::Sub for Vec3 {
-    type Output = Self;
-    #[inline]
-    fn sub(self, rhs: Self) -> Self {
-        Self::new(self.x - rhs.x, self.y - rhs.y, self.z - rhs.z)
-    }
-}
-
-impl std::ops::Mul<f64> for Vec3 {
-    type Output = Self;
-    #[inline]
-    fn mul(self, s: f64) -> Self {
-        Self::new(self.x * s, self.y * s, self.z * s)
-    }
-}
 
 /// Cold-target elastic scatter, isotropic in CM. Standard textbook
 /// formula. Returns `(new_energy_eV, new_direction)`.

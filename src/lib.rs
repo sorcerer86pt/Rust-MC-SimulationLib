@@ -8,13 +8,20 @@ pub mod batch;
 pub mod cdf;
 pub mod cp;
 pub mod cram;
+pub mod decay;
+pub mod depletion;
 pub mod doppler;
 pub mod ducru;
 pub mod error;
+pub mod fission_yields;
+pub mod geometry;
+pub mod kinetics;
 pub mod physics;
 pub mod rng;
 pub mod svd;
 pub mod table;
+pub mod tally;
+pub mod transport;
 pub mod urr;
 
 #[cfg(feature = "nuclear")]
