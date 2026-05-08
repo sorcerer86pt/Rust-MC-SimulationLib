@@ -402,21 +402,47 @@ pub fn shannon_entropy(
     source_box: ([f64; 3], [f64; 3]),
     n_bins: usize,
 ) -> f64 {
+    shannon_entropy_xyz(
+        sites.iter().map(|s| [s.pos.x, s.pos.y, s.pos.z]),
+        source_box,
+        n_bins,
+    )
+}
+
+/// Shannon entropy of a stream of `(x, y, z)` positions on the same
+/// `n_bins`³ Cartesian mesh used by [`shannon_entropy`]. Decoupled
+/// from any particular site type so engine-side callers (which carry
+/// their own `FissionSite` flavour, photon source events, etc.) can
+/// reuse the same binning + log₂ accounting without converting
+/// through `FissionSite`.
+///
+/// `source_box` is `(min_xyz, max_xyz)`. `n_bins` is the number of
+/// bins per axis (so the mesh has `n_bins³` total bins). Returns
+/// `0.0` for an empty input.
+pub fn shannon_entropy_xyz<I>(
+    positions: I,
+    source_box: ([f64; 3], [f64; 3]),
+    n_bins: usize,
+) -> f64
+where
+    I: IntoIterator<Item = [f64; 3]>,
+{
     let ([xmin, ymin, zmin], [xmax, ymax, zmax]) = source_box;
     let dx = (xmax - xmin).max(1e-30);
     let dy = (ymax - ymin).max(1e-30);
     let dz = (zmax - zmin).max(1e-30);
     let total_bins = n_bins * n_bins * n_bins;
     let mut counts = vec![0_u32; total_bins];
-    let n_total = sites.len();
+    let mut n_total = 0_usize;
+    for p in positions {
+        let i = (((p[0] - xmin) / dx * n_bins as f64).floor() as usize).min(n_bins - 1);
+        let j = (((p[1] - ymin) / dy * n_bins as f64).floor() as usize).min(n_bins - 1);
+        let k = (((p[2] - zmin) / dz * n_bins as f64).floor() as usize).min(n_bins - 1);
+        counts[i * n_bins * n_bins + j * n_bins + k] += 1;
+        n_total += 1;
+    }
     if n_total == 0 {
         return 0.0;
-    }
-    for s in sites {
-        let i = (((s.pos.x - xmin) / dx * n_bins as f64).floor() as usize).min(n_bins - 1);
-        let j = (((s.pos.y - ymin) / dy * n_bins as f64).floor() as usize).min(n_bins - 1);
-        let k = (((s.pos.z - zmin) / dz * n_bins as f64).floor() as usize).min(n_bins - 1);
-        counts[i * n_bins * n_bins + j * n_bins + k] += 1;
     }
     let mut h = 0.0_f64;
     for &c in &counts {
@@ -426,4 +452,77 @@ pub fn shannon_entropy(
         }
     }
     h
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    /// Empty input → entropy = 0 (no points means no distribution).
+    #[test]
+    fn shannon_entropy_xyz_empty_returns_zero() {
+        let h = shannon_entropy_xyz(
+            std::iter::empty::<[f64; 3]>(),
+            ([0.0, 0.0, 0.0], [1.0, 1.0, 1.0]),
+            8,
+        );
+        assert_eq!(h, 0.0);
+    }
+
+    /// All points in one bin → entropy = 0 (perfectly localised).
+    #[test]
+    fn shannon_entropy_xyz_single_bin_returns_zero() {
+        let pts = vec![[0.5_f64, 0.5, 0.5]; 100];
+        let h = shannon_entropy_xyz(pts, ([0.0, 0.0, 0.0], [1.0, 1.0, 1.0]), 4);
+        assert_eq!(h, 0.0);
+    }
+
+    /// Uniform spread over `n³` bins → entropy = 3·log₂(n) (the
+    /// max-entropy upper bound). One point per bin makes this exact.
+    #[test]
+    fn shannon_entropy_xyz_uniform_hits_log2_n_cubed() {
+        let n = 4_usize;
+        let mut pts = Vec::new();
+        let dx = 1.0 / n as f64;
+        for i in 0..n {
+            for j in 0..n {
+                for k in 0..n {
+                    pts.push([
+                        (i as f64 + 0.5) * dx,
+                        (j as f64 + 0.5) * dx,
+                        (k as f64 + 0.5) * dx,
+                    ]);
+                }
+            }
+        }
+        let h = shannon_entropy_xyz(pts, ([0.0, 0.0, 0.0], [1.0, 1.0, 1.0]), n);
+        let expected = 3.0 * (n as f64).log2();
+        assert!(
+            (h - expected).abs() < 1e-12,
+            "uniform entropy {h}, expected {expected}",
+        );
+    }
+
+    /// `shannon_entropy` (FissionSite slice) and `shannon_entropy_xyz`
+    /// (position iterator) must agree on the same input — the
+    /// FissionSite path is just a thin adapter over the position one.
+    #[test]
+    fn shannon_entropy_and_xyz_agree() {
+        use crate::transport::particle::FissionSite;
+        use crate::geometry::Vec3;
+        let sites = vec![
+            FissionSite { pos: Vec3 { x: 0.1, y: 0.1, z: 0.1 }, energy: 1.0e6, weight: 1.0 },
+            FissionSite { pos: Vec3 { x: 0.9, y: 0.5, z: 0.3 }, energy: 1.0e6, weight: 1.0 },
+            FissionSite { pos: Vec3 { x: 0.5, y: 0.5, z: 0.5 }, energy: 1.0e6, weight: 1.0 },
+        ];
+        let bb = ([0.0, 0.0, 0.0], [1.0, 1.0, 1.0]);
+        let h_sites = shannon_entropy(&sites, bb, 4);
+        let h_xyz = shannon_entropy_xyz(
+            sites.iter().map(|s| [s.pos.x, s.pos.y, s.pos.z]),
+            bb,
+            4,
+        );
+        assert!((h_sites - h_xyz).abs() < 1e-15);
+    }
 }
