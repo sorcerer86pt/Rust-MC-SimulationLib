@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! γ-shielding demo — Cs-137 661.7 keV line through a slab of lead.
 //! Demonstrates the [`run_photon_fixed_source`] driver and the
 //! photon interaction kernels (Klein-Nishina + photoelectric + pair
@@ -30,8 +31,7 @@ use rust_mc_sim::geometry::cell::{Cell, CellFill, CellId, between};
 use rust_mc_sim::geometry::surface::BoundaryCondition;
 use rust_mc_sim::geometry::{Surface, Vec3};
 use rust_mc_sim::photon::{
-    IsotropicLineSource, PhotonFixedSourceConfig, PhotonMaterial,
-    run_photon_fixed_source,
+    IsotropicLineSource, PhotonFixedSourceConfig, PhotonMaterial, run_photon_fixed_source,
 };
 use rust_mc_sim::tally::{FluxBin, FluxTally};
 
@@ -63,8 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Load Pb photon data.
     let pb_path = data_dir.join("Pb.h5");
-    let pb_element =
-        Arc::new(rust_mc_sim::photon::loader::load_photon_element(&pb_path)?);
+    let pb_element = Arc::new(rust_mc_sim::photon::loader::load_photon_element(&pb_path)?);
     println!(
         "loaded Pb (Z={}, {} energy points), N = {:.4e} atoms/b·cm",
         pb_element.z,

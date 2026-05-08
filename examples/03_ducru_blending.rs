@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Ducru-weighted reconstruction at off-grid target columns.
 //!
 //! Demonstrates both the raw weights (L2-optimal) and the

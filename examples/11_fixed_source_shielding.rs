@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Fixed-source shielding demo — Watt-fission point source streaming
 //! through a slab of light water, with leakage tallied at the far
 //! face. Demonstrates the [`run_fixed_source`] driver and the
@@ -33,8 +34,7 @@ use rust_mc_sim::geometry::cell::{Cell, CellFill, CellId, between};
 use rust_mc_sim::geometry::surface::BoundaryCondition;
 use rust_mc_sim::geometry::{Surface, Vec3};
 use rust_mc_sim::nuclear::loader::{
-    LoaderConfig, attach_thermal_scattering, load_nuclide_from_hdf5,
-    load_thermal_scattering,
+    LoaderConfig, attach_thermal_scattering, load_nuclide_from_hdf5, load_thermal_scattering,
 };
 use rust_mc_sim::tally::{FluxBin, FluxTally};
 use rust_mc_sim::transport::fixed_source::{

@@ -90,12 +90,7 @@ pub fn find_cell(pos: Vec3, surfaces: &[Surface], cells: &[Cell]) -> Option<usiz
 /// `pos`. Bottleneck cost on large geometries (≥ a few hundred
 /// cells) drops from O(N) cell tests to O(log N + leaves-overlapping-pos).
 #[inline]
-pub fn find_cell_bvh(
-    pos: Vec3,
-    surfaces: &[Surface],
-    cells: &[Cell],
-    bvh: &Bvh,
-) -> Option<usize> {
+pub fn find_cell_bvh(pos: Vec3, surfaces: &[Surface], cells: &[Cell], bvh: &Bvh) -> Option<usize> {
     bvh.find_cell(pos, surfaces, cells)
 }
 

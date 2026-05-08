@@ -150,7 +150,6 @@ fn expm_pade_8(m: &[[f64; 8]; 8], t: f64) -> [[f64; 8]; 8] {
     out
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

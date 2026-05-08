@@ -51,9 +51,7 @@ impl PhotonMaterial {
         let mut sigma = 0.0_f64;
         for (e, density) in &self.elements {
             let xs = match channel {
-                PhotonReaction::Coherent => {
-                    interpolate_log_log(&e.energy, &e.coherent_xs, energy)
-                }
+                PhotonReaction::Coherent => interpolate_log_log(&e.energy, &e.coherent_xs, energy),
                 PhotonReaction::Incoherent => {
                     interpolate_log_log(&e.energy, &e.incoherent_xs, energy)
                 }
@@ -62,11 +60,7 @@ impl PhotonMaterial {
                 }
                 PhotonReaction::PairProduction => {
                     interpolate_log_log(&e.energy, &e.pair_production_nuclear_xs, energy)
-                        + interpolate_log_log(
-                            &e.energy,
-                            &e.pair_production_electron_xs,
-                            energy,
-                        )
+                        + interpolate_log_log(&e.energy, &e.pair_production_electron_xs, energy)
                 }
             };
             sigma += density * xs;

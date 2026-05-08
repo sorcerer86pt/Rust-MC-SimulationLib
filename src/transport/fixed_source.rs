@@ -160,8 +160,7 @@ pub fn run_fixed_source<S: NeutronSource>(
 
         for _ in 0..cfg.n_particles_per_batch {
             let s = source.sample(&mut rng);
-            let cell_idx =
-                ray::find_cell_bvh(s.pos, surfaces, cells, &bvh).unwrap_or(0);
+            let cell_idx = ray::find_cell_bvh(s.pos, surfaces, cells, &bvh).unwrap_or(0);
             let mut p = Particle::new(s.pos, s.dir, s.energy, cell_idx);
             p.weight = s.weight;
             transport_one(

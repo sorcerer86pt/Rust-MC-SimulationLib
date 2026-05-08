@@ -79,10 +79,23 @@ pub fn auto_color_from_name(name: &str) -> Option<[u8; 3]> {
     // Fuel-burnup keywords work even without an explicit "fuel"
     // word — reload patterns commonly say just "first / second /
     // third cycle" or "fresh / mid / burnt".
-    let is_fuel_keyword =
-        any(&["uo2", "uo₂", "uranium", "fuel", "first cycle", "1st cycle",
-              "second cycle", "2nd cycle", "third cycle", "3rd cycle",
-              "boc", "eoc", "fresh", "mid-core", "mid core"]);
+    let is_fuel_keyword = any(&[
+        "uo2",
+        "uo₂",
+        "uranium",
+        "fuel",
+        "first cycle",
+        "1st cycle",
+        "second cycle",
+        "2nd cycle",
+        "third cycle",
+        "3rd cycle",
+        "boc",
+        "eoc",
+        "fresh",
+        "mid-core",
+        "mid core",
+    ]);
     if is_fuel_keyword {
         if any(&["burnt", "depleted", "spent", "third", "3rd cycle", "eoc"]) {
             return Some([120, 60, 80]); // burnt — purple-red
@@ -110,10 +123,7 @@ pub fn auto_color_from_name(name: &str) -> Option<[u8; 3]> {
     if any(&["lead-bismuth", "lbe", "pbbi", "pb-bi"]) {
         return Some([60, 80, 100]);
     }
-    if n.contains("lead")
-        || n.split_whitespace().any(|w| w == "pb")
-        || n.starts_with("pb ")
-    {
+    if n.contains("lead") || n.split_whitespace().any(|w| w == "pb") || n.starts_with("pb ") {
         return Some([70, 70, 90]);
     }
     if any(&["graphite", "carbon"]) {
@@ -255,9 +265,7 @@ impl MaterialPalette {
             .enumerate()
             .map(|(i, m)| {
                 auto_color_from_name(m.name())
-                    .unwrap_or_else(|| {
-                        fallback.colors.get(i).copied().unwrap_or(fallback.void)
-                    })
+                    .unwrap_or_else(|| fallback.colors.get(i).copied().unwrap_or(fallback.void))
             })
             .collect();
         Self {
@@ -322,7 +330,10 @@ mod tests {
 
     #[test]
     fn light_water_is_cool_blue() {
-        approx_color(auto_color_from_name("light water moderator"), [80, 150, 230]);
+        approx_color(
+            auto_color_from_name("light water moderator"),
+            [80, 150, 230],
+        );
         approx_color(auto_color_from_name("H2O"), [80, 150, 230]);
         approx_color(auto_color_from_name("H₂O at 583 K"), [80, 150, 230]);
     }
@@ -381,9 +392,9 @@ mod tests {
         // Verify that the BVH-accelerated render produces non-void
         // pixels for both materials (i.e. the BVH actually finds
         // them, no black screen).
+        use crate::geometry::Surface;
         use crate::geometry::cell::{Cell, CellFill, CellId, between, inside};
         use crate::geometry::surface::BoundaryCondition;
-        use crate::geometry::Surface;
         use crate::transport::material::Material;
 
         let materials = vec![
@@ -405,16 +416,20 @@ mod tests {
             },
         ];
         let cells = vec![
-            Cell::new(CellId(0), inside(0), CellFill::Material(0))
-                .with_aabb_from_region(&surfaces),
+            Cell::new(CellId(0), inside(0), CellFill::Material(0)).with_aabb_from_region(&surfaces),
             Cell::new(CellId(1), between(0, 1), CellFill::Material(1))
                 .with_aabb_from_region(&surfaces),
         ];
         let cell_materials = vec![0_usize, 1];
         let palette = MaterialPalette::for_materials(&materials);
         let viewport = Viewport::square_centered(12.0, 0.0, 100);
-        let buf =
-            render_top_down(&cells, &surfaces, |i| cell_materials[i], &palette, &viewport);
+        let buf = render_top_down(
+            &cells,
+            &surfaces,
+            |i| cell_materials[i],
+            &palette,
+            &viewport,
+        );
 
         let void = pack_rgb(palette.void);
         let n_void = buf.iter().filter(|&&c| c == void).count();
@@ -459,12 +474,8 @@ mod tests {
 ///
 /// Pass `legend` empty (`Vec::new()`) to disable the popup; in that
 /// case `L` does nothing.
-pub fn show_window<F>(
-    initial: Viewport,
-    title: &str,
-    legend: Vec<LegendEntry>,
-    mut render: F,
-) where
+pub fn show_window<F>(initial: Viewport, title: &str, legend: Vec<LegendEntry>, mut render: F)
+where
     F: FnMut(&Viewport) -> Vec<u32>,
 {
     use minifb::{Key, Window, WindowOptions};
@@ -588,7 +599,11 @@ fn render_legend(legend: &[LegendEntry]) -> (Vec<u32>, usize, usize) {
     let swatch = 28_usize;
     let pad_x = 12_usize;
     let pad_y = 8_usize;
-    let max_label_chars = legend.iter().map(|e| e.label.chars().count()).max().unwrap_or(0);
+    let max_label_chars = legend
+        .iter()
+        .map(|e| e.label.chars().count())
+        .max()
+        .unwrap_or(0);
     let label_width = max_label_chars * 8 * scale;
     let w = pad_x + swatch + 12 + label_width + pad_x;
     let h = pad_y * 2 + row_height * legend.len().max(1);
@@ -606,8 +621,7 @@ fn render_legend(legend: &[LegendEntry]) -> (Vec<u32>, usize, usize) {
                 let py = y0 + dy;
                 let px = x0 + dx;
                 if px < w && py < h {
-                    let on_border =
-                        dx == 0 || dy == 0 || dx == swatch - 1 || dy == swatch - 1;
+                    let on_border = dx == 0 || dy == 0 || dx == swatch - 1 || dy == swatch - 1;
                     buf[py * w + px] = if on_border { 0x000000 } else { swatch_color };
                 }
             }

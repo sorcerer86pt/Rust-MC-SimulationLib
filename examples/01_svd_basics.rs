@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Truncated SVD on a smooth 2D function.
 //!
 //! Run with: `cargo run --release --example 01_svd_basics`

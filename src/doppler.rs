@@ -162,7 +162,9 @@ fn interpolate(e_in: &[f64], xs_in: &[f64], e_out: &[f64]) -> Vec<f64> {
             if e <= e_in[0] || e_in.len() < 2 {
                 return *xs_in.first().unwrap_or(&0.0);
             }
-            let last = *e_in.last().unwrap();
+            // Safe: branch above already returned if `e_in.len() < 2`,
+            // so `e_in.last()` is `Some(_)` at this point.
+            let last = *e_in.last().unwrap_or(&e_in[0]);
             if e >= last {
                 return *xs_in.last().unwrap_or(&0.0);
             }

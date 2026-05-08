@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! End-to-end k-eigenvalue power iteration on a bare critical sphere
 //! ("Godiva-like") using synthetic, energy-independent cross
 //! sections. The point is to exercise the *full* transport pipeline
@@ -49,11 +50,12 @@ fn main() {
         radius: radius_cm,
         bc: BoundaryCondition::Vacuum,
     }];
-    let cells = vec![Cell::new(CellId(0), inside(0), CellFill::Material(0))
-        .with_aabb(Aabb {
+    let cells = vec![
+        Cell::new(CellId(0), inside(0), CellFill::Material(0)).with_aabb(Aabb {
             min: Vec3::new(-radius_cm, -radius_cm, -radius_cm),
             max: Vec3::new(radius_cm, radius_cm, radius_cm),
-        })];
+        }),
+    ];
     let materials = [mat];
 
     // 4) Run a small k-eigenvalue power iteration. With synthetic

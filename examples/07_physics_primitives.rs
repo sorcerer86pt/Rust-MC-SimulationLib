@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Physics primitives: scatter + angular + spectra in one place.
 //!
 //! Run with: `cargo run --release --example 07_physics_primitives`

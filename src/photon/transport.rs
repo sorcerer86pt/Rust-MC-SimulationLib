@@ -9,8 +9,8 @@ use crate::geometry::bvh::Bvh;
 use crate::geometry::surface::BoundaryCondition;
 use crate::geometry::{Cell, Surface, Vec3, ray};
 use crate::photon::interactions::{
-    PAIR_THRESHOLD_EV, PhotonReaction, sample_coherent_forward, sample_compton_free,
-    sample_pair, sample_photoelectric,
+    PAIR_THRESHOLD_EV, PhotonReaction, sample_coherent_forward, sample_compton_free, sample_pair,
+    sample_photoelectric,
 };
 use crate::photon::material::PhotonMaterial;
 use crate::photon::source::{PhotonSource, SourcePhoton};
@@ -87,8 +87,7 @@ pub fn run_photon_fixed_source<S: PhotonSource>(
 
         for _ in 0..cfg.n_particles_per_batch {
             let s: SourcePhoton = source.sample(&mut rng);
-            let cell_idx =
-                ray::find_cell_bvh(s.pos, surfaces, cells, &bvh).unwrap_or(0);
+            let cell_idx = ray::find_cell_bvh(s.pos, surfaces, cells, &bvh).unwrap_or(0);
             let mut stack: Vec<ActivePhoton> = vec![ActivePhoton {
                 pos: s.pos,
                 dir: s.dir,

@@ -11,9 +11,9 @@
 
 use crate::geometry::bvh::Bvh;
 use crate::geometry::surface::BoundaryCondition;
-use crate::geometry::{ray, Cell, Surface, Vec3};
+use crate::geometry::{Cell, Surface, Vec3, ray};
 use crate::rng::Pcg64;
-use crate::transport::collision::{collide_in_material, CollisionOutcome};
+use crate::transport::collision::{CollisionOutcome, collide_in_material};
 use crate::transport::material::Material;
 use crate::transport::particle::{FissionBank, FissionSite, Particle, ParticleStatus};
 
@@ -103,8 +103,7 @@ pub fn run_eigenvalue(
             weight_in += site.weight;
             let (u, v, w) = rng.isotropic_direction();
             let initial_dir = Vec3::new(u, v, w);
-            let cell_idx =
-                ray::find_cell_bvh(site.pos, surfaces, cells, &bvh).unwrap_or(0);
+            let cell_idx = ray::find_cell_bvh(site.pos, surfaces, cells, &bvh).unwrap_or(0);
             let mut p = Particle::new(site.pos, initial_dir, site.energy, cell_idx);
             transport_one(
                 &mut p,
@@ -222,8 +221,7 @@ fn transport_one(
                 }
                 Some(CollisionOutcome::Multiplicity { secondaries }) => {
                     for s in secondaries {
-                        let mut sec_p =
-                            Particle::new(s.pos, s.dir, s.energy, p.cell_idx);
+                        let mut sec_p = Particle::new(s.pos, s.dir, s.energy, p.cell_idx);
                         transport_secondary(
                             &mut sec_p,
                             cells,

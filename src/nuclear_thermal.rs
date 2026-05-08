@@ -152,12 +152,7 @@ impl crate::physics::thermal::ThermalScatterer for ThermalScatteringData {
         ThermalScatteringData::total_xs(self, energy, temp_idx)
     }
 
-    fn sample(
-        &self,
-        energy: f64,
-        temperature_k: f64,
-        rng: &mut Rng,
-    ) -> (f64, f64) {
+    fn sample(&self, energy: f64, temperature_k: f64, rng: &mut Rng) -> (f64, f64) {
         let xi_t = rng.uniform();
         let temp_idx = self.select_temperature(temperature_k, xi_t);
         ThermalScatteringData::sample(self, energy, temp_idx, rng)

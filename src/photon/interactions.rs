@@ -145,6 +145,7 @@ fn sample_bethe_heitler_epsilon(rng: &mut Pcg64) -> f64 {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use crate::rng::Pcg64;
@@ -163,7 +164,10 @@ mod tests {
         }
         let mean_e = sum_e / n as f64;
         let rel = (mean_e - energy).abs() / energy;
-        assert!(rel < 0.01, "Thomson limit violated: ⟨E⟩ = {mean_e}, want {energy}");
+        assert!(
+            rel < 0.01,
+            "Thomson limit violated: ⟨E⟩ = {mean_e}, want {energy}"
+        );
     }
 
     #[test]

@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! ASCII geometry previews — same CSG geometry as the windowed
 //! examples 13 and 14, but printed straight to the terminal. No GUI
 //! deps needed at runtime, useful as a quick visual sanity check
@@ -9,9 +10,9 @@
 //! cargo run --release --features preview --example 15_ascii_reactor_preview
 //! ```
 
+use rust_mc_sim::geometry::Surface;
 use rust_mc_sim::geometry::cell::{Cell, CellFill, CellId, between, inside};
 use rust_mc_sim::geometry::surface::BoundaryCondition;
-use rust_mc_sim::geometry::Surface;
 use rust_mc_sim::preview::{Viewport, print_ascii};
 use rust_mc_sim::transport::material::Material;
 
@@ -109,12 +110,9 @@ fn build_pin_cell() -> Vec<Cell> {
         Box::new(inside_box),
     );
     vec![
-        Cell::new(CellId(0), inside(0), CellFill::Material(0))
-            .with_aabb_from_region(&surfaces),
-        Cell::new(CellId(1), between(0, 1), CellFill::Material(1))
-            .with_aabb_from_region(&surfaces),
-        Cell::new(CellId(2), outside_clad, CellFill::Material(2))
-            .with_aabb_from_region(&surfaces),
+        Cell::new(CellId(0), inside(0), CellFill::Material(0)).with_aabb_from_region(&surfaces),
+        Cell::new(CellId(1), between(0, 1), CellFill::Material(1)).with_aabb_from_region(&surfaces),
+        Cell::new(CellId(2), outside_clad, CellFill::Material(2)).with_aabb_from_region(&surfaces),
     ]
 }
 
@@ -131,11 +129,27 @@ fn print_cp1_core() {
     const RADIUS_BATCH_1: f64 = 60.0;
     const RADIUS_BATCH_2: f64 = 120.0;
     const CONTROL_POSITIONS: &[(i32, i32)] = &[
-        (0, 0), (0, 4), (0, -4), (4, 0), (-4, 0),
-        (4, 4), (4, -4), (-4, 4), (-4, -4),
-        (0, 7), (0, -7), (7, 0), (-7, 0),
-        (3, 6), (3, -6), (-3, 6), (-3, -6),
-        (6, 3), (6, -3), (-6, 3), (-6, -3),
+        (0, 0),
+        (0, 4),
+        (0, -4),
+        (4, 0),
+        (-4, 0),
+        (4, 4),
+        (4, -4),
+        (-4, 4),
+        (-4, -4),
+        (0, 7),
+        (0, -7),
+        (7, 0),
+        (-7, 0),
+        (3, 6),
+        (3, -6),
+        (-3, 6),
+        (-3, -6),
+        (6, 3),
+        (6, -3),
+        (-6, 3),
+        (-6, -3),
     ];
     const MAT_FRESH: usize = 0;
     const MAT_MID: usize = 1;
@@ -257,5 +271,11 @@ fn print_cp1_core() {
         width: 90,
         height: 45,
     };
-    print_ascii(&cells, &surfaces, &materials, |i| cell_materials[i], &viewport);
+    print_ascii(
+        &cells,
+        &surfaces,
+        &materials,
+        |i| cell_materials[i],
+        &viewport,
+    );
 }

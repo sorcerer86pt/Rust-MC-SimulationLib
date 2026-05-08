@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Light-water reactor pin cell — medium-class three-loop PWR with
 //! real ENDF/B-VII.1 nuclear data.
 //!
@@ -41,12 +42,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
+use rust_mc_sim::geometry::Surface;
 use rust_mc_sim::geometry::cell::{Cell, CellFill, CellId, Region, between, inside, outside};
 use rust_mc_sim::geometry::surface::BoundaryCondition;
-use rust_mc_sim::geometry::Surface;
 use rust_mc_sim::nuclear::loader::{
-    LoaderConfig, attach_thermal_scattering, load_nuclide_from_hdf5,
-    load_thermal_scattering,
+    LoaderConfig, attach_thermal_scattering, load_nuclide_from_hdf5, load_thermal_scattering,
 };
 use rust_mc_sim::transport::material::{Material, Nuclide};
 use rust_mc_sim::transport::simulate::{EigenvalueConfig, run_eigenvalue};
@@ -120,9 +120,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arc::new(attach_thermal_scattering(h1_free, kernel))
         }
         Err(e) => {
-            eprintln!(
-                "warning: c_H_in_H2O.h5 not found ({e}); running without S(α,β)"
-            );
+            eprintln!("warning: c_H_in_H2O.h5 not found ({e}); running without S(α,β)");
             Arc::new(h1_free)
         }
     };
@@ -184,10 +182,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     let inside_box = Region::Intersection(Box::new(between(2, 3)), Box::new(between(4, 5)));
-    let cell_fuel = Cell::new(CellId(0), inside(0), CellFill::Material(0))
-        .with_aabb_from_region(&surfaces);
-    let cell_clad = Cell::new(CellId(1), between(0, 1), CellFill::Material(1))
-        .with_aabb_from_region(&surfaces);
+    let cell_fuel =
+        Cell::new(CellId(0), inside(0), CellFill::Material(0)).with_aabb_from_region(&surfaces);
+    let cell_clad =
+        Cell::new(CellId(1), between(0, 1), CellFill::Material(1)).with_aabb_from_region(&surfaces);
     let cell_mod = Cell::new(
         CellId(2),
         Region::Intersection(Box::new(outside(1)), Box::new(inside_box)),

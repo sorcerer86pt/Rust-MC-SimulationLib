@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Build a log-decimated CDF and verify the sampled distribution
 //! matches the underlying intensities at a fixed point.
 //!

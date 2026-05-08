@@ -55,14 +55,76 @@ preview = ["dep:minifb", "dep:font8x8"]
 [dev-dependencies]
 # Add criterion later if we want benchmarks; keep deps minimal for now.
 
+# Examples gated on the optional features they consume. Without these
+# `[[example]]` declarations cargo would try to build them with the
+# default feature set (pure-math only), which fails on the missing
+# `rust_mc_sim::nuclear::*` and `rust_mc_sim::preview::*` paths.
+[[example]]
+name = "10_pwr_pin_cell"
+required-features = ["nuclear"]
+
+[[example]]
+name = "11_fixed_source_shielding"
+required-features = ["nuclear"]
+
+[[example]]
+name = "12_photon_shielding"
+required-features = ["nuclear"]
+
+[[example]]
+name = "13_reactor_preview"
+required-features = ["preview"]
+
+[[example]]
+name = "14_french_cp1_core_preview"
+required-features = ["preview"]
+
+[[example]]
+name = "15_ascii_reactor_preview"
+required-features = ["preview"]
+
+[[example]]
+name = "16_pwr_assembly_keff"
+required-features = ["nuclear", "preview"]
+
 [profile.release]
 opt-level = 3
 lto = "thin"
 
 [lints.clippy]
+# Correctness / safety lints kept on. Numerical-code idioms that
+# clippy flags as bugs but are deliberate physics conventions are
+# allowed below.
 unwrap_used = "deny"
 undocumented_unsafe_blocks = "warn"
 cast_possible_truncation = "allow"
 cast_precision_loss = "allow"
 cast_sign_loss = "allow"
 module_name_repetitions = "allow"
+# Numerical-code idioms that clippy flags but are deliberate here:
+#   - Matrix / per-axis loops genuinely need the index (CRAM solver,
+#     Gauss-Jordan, lattice axis dispatch, FSR walks).
+#   - Transcendental constants (CRAM IPF poles/residues, Gauss-
+#     Legendre nodes/weights) need every digit of f64 precision —
+#     clippy's "excessive precision" treats them like typos.
+#   - Documentation prose: aligned doc list continuations, lazy
+#     continuations after a colon are intentional for readability of
+#     physics derivations.
+#   - `vec![…]` in test fixtures stays.
+#   - Per-step builders are typically built incrementally
+#     (`Default::default()` then `.field = Some(…)`); clippy's
+#     `field_reassign_with_default` would force struct-update syntax.
+#   - Transport / variance-reduction functions take many arguments
+#     by physics necessity (XS, geometry, RNG, tallies, …).
+needless_range_loop = "allow"
+excessive_precision = "allow"
+useless_vec = "allow"
+doc_overindented_list_items = "allow"
+doc_lazy_continuation = "allow"
+field_reassign_with_default = "allow"
+too_many_arguments = "allow"
+collapsible_if = "allow"
+collapsible_match = "allow"
+double_comparisons = "allow"
+manual_memcpy = "allow"
+needless_late_init = "allow"

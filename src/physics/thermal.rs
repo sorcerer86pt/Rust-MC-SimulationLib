@@ -21,10 +21,5 @@ pub trait ThermalScatterer: Send + Sync {
     fn total_xs(&self, energy: f64, temperature_k: f64) -> f64;
 
     /// Sample `(E_out, μ_lab)` from the bound-atom kernel.
-    fn sample(
-        &self,
-        energy: f64,
-        temperature_k: f64,
-        rng: &mut Pcg64,
-    ) -> (f64, f64);
+    fn sample(&self, energy: f64, temperature_k: f64, rng: &mut Pcg64) -> (f64, f64);
 }

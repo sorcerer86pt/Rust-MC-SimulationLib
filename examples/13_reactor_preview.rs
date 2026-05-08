@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Geometry previewer demo — a stylised PWR fuel-assembly cross
 //! section (CP1 / Almaraz pin geometry, 17 × 17 lattice with four
 //! control-rod positions) inside a circular vessel. Opens a window
@@ -17,9 +18,9 @@
 
 use std::sync::Arc;
 
+use rust_mc_sim::geometry::Surface;
 use rust_mc_sim::geometry::cell::{Cell, CellFill, CellId, Region, between, inside, outside};
 use rust_mc_sim::geometry::surface::BoundaryCondition;
-use rust_mc_sim::geometry::Surface;
 use rust_mc_sim::preview::{Viewport, preview_geometry};
 use rust_mc_sim::transport::material::{Material, Nuclide};
 

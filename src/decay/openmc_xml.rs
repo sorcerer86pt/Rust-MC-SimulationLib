@@ -18,9 +18,7 @@ use std::path::Path;
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 
-use crate::decay::chain::{
-    DecayChain, DecayMode, DecayNuclide, ReactionChannel, ReactionTarget,
-};
+use crate::decay::chain::{DecayChain, DecayMode, DecayNuclide, ReactionChannel, ReactionTarget};
 use crate::fission_yields::{FissionYields, YieldTable};
 
 #[derive(Debug)]
@@ -145,8 +143,7 @@ pub fn parse_chain_xml<R: std::io::BufRead>(reader: R) -> Result<DecayChain, Cha
                             }
                         }
                         TextTarget::Products => {
-                            current_fy_products
-                                .extend(s.split_whitespace().map(str::to_string));
+                            current_fy_products.extend(s.split_whitespace().map(str::to_string));
                         }
                         TextTarget::Data => {
                             for tok in s.split_whitespace() {

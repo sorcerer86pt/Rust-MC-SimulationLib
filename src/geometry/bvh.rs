@@ -42,9 +42,21 @@ impl Bvh {
                 let aabb = c.aabb;
                 // Centroid: substitute 0 on infinite axes so sort
                 // ordering is well-defined.
-                let cx = if aabb.center().x.is_finite() { aabb.center().x } else { 0.0 };
-                let cy = if aabb.center().y.is_finite() { aabb.center().y } else { 0.0 };
-                let cz = if aabb.center().z.is_finite() { aabb.center().z } else { 0.0 };
+                let cx = if aabb.center().x.is_finite() {
+                    aabb.center().x
+                } else {
+                    0.0
+                };
+                let cy = if aabb.center().y.is_finite() {
+                    aabb.center().y
+                } else {
+                    0.0
+                };
+                let cz = if aabb.center().z.is_finite() {
+                    aabb.center().z
+                } else {
+                    0.0
+                };
                 (i, aabb, Vec3::new(cx, cy, cz))
             })
             .collect();
@@ -221,6 +233,9 @@ mod tests {
         let pos_right = Vec3::new(1.0, 0.0, 5.0);
         assert_eq!(bvh.find_cell(pos_right, &surfaces, &cells), Some(1));
         // Point in the gap at the origin — no cell.
-        assert!(bvh.find_cell(Vec3::new(0.0, 0.0, 0.0), &surfaces, &cells).is_none());
+        assert!(
+            bvh.find_cell(Vec3::new(0.0, 0.0, 0.0), &surfaces, &cells)
+                .is_none()
+        );
     }
 }

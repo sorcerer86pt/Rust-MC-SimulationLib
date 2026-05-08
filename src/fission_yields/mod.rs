@@ -63,7 +63,10 @@ impl FissionYields {
         } else if energy_ev >= energies[last] {
             (energies[last], energies[last], 0.0)
         } else {
-            let upper = energies.iter().position(|&e| e >= energy_ev).unwrap_or(last);
+            let upper = energies
+                .iter()
+                .position(|&e| e >= energy_ev)
+                .unwrap_or(last);
             let lower = upper - 1;
             let e_lo = energies[lower];
             let e_hi = energies[upper];
@@ -85,6 +88,7 @@ impl FissionYields {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

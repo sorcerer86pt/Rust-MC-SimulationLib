@@ -51,10 +51,8 @@ pub fn load_photon_element(path: &Path) -> NuclearResult<PhotonElement> {
     let coherent_xs = read_xs(&element, "coherent", n_e, &mk_err)?;
     let incoherent_xs = read_xs(&element, "incoherent", n_e, &mk_err)?;
     let photoelectric_xs = read_xs(&element, "photoelectric", n_e, &mk_err)?;
-    let pair_production_nuclear_xs =
-        read_xs(&element, "pair_production_nuclear", n_e, &mk_err)?;
-    let pair_production_electron_xs =
-        read_xs(&element, "pair_production_electron", n_e, &mk_err)?;
+    let pair_production_nuclear_xs = read_xs(&element, "pair_production_nuclear", n_e, &mk_err)?;
+    let pair_production_electron_xs = read_xs(&element, "pair_production_electron", n_e, &mk_err)?;
 
     Ok(PhotonElement {
         z,

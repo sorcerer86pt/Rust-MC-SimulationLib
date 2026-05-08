@@ -49,11 +49,11 @@ pub fn interpolate_log_log(xs_grid: &[f64], ys: &[f64], x: f64) -> f64 {
     if x >= xs_grid[n - 1] {
         return ys[n - 1];
     }
-    let i = match xs_grid.binary_search_by(|v| v.partial_cmp(&x).unwrap_or(std::cmp::Ordering::Less))
-    {
-        Ok(i) => return ys[i],
-        Err(i) => i - 1,
-    };
+    let i =
+        match xs_grid.binary_search_by(|v| v.partial_cmp(&x).unwrap_or(std::cmp::Ordering::Less)) {
+            Ok(i) => return ys[i],
+            Err(i) => i - 1,
+        };
     let x_lo = xs_grid[i];
     let x_hi = xs_grid[i + 1];
     let y_lo = ys[i].max(1.0e-30);

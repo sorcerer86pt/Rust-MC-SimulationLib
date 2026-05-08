@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Side-by-side comparison: PointwiseTable (the production-baseline
 //! lookup) against SvdKernel (the SVD-compressed reconstruction)
 //! against the Ducru-blended off-grid SVD reconstruction.

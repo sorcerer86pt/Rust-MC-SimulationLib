@@ -19,9 +19,9 @@ use std::sync::Arc;
 
 use crate::error::{NuclearError, NuclearResult};
 use crate::nuclear_hdf5::{
-    self as hdf5_reader, AngularDistribution as HdfAngular,
-    EnergyDistribution as HdfEnergy, NuclideData, TabularEnergyDist as HdfTabularE,
-    TabularMuDist as HdfTabularMu, UrrProbabilityTables as HdfUrr,
+    self as hdf5_reader, AngularDistribution as HdfAngular, EnergyDistribution as HdfEnergy,
+    NuclideData, TabularEnergyDist as HdfTabularE, TabularMuDist as HdfTabularMu,
+    UrrProbabilityTables as HdfUrr,
 };
 use crate::physics::angular::{AngularDistribution, TabularMuDist};
 use crate::physics::spectra::{EnergyDistribution, TabularEnergyDist};
@@ -103,8 +103,7 @@ pub fn load_nuclide_from_hdf5(
     if cfg.include_nu_bar {
         if let Ok(nu) = hdf5_reader::read_nu_bar(path) {
             if !nu.energies.is_empty() {
-                nuclide.nu_bar_table =
-                    Some(PointwiseTable::new(nu.energies, nu.values));
+                nuclide.nu_bar_table = Some(PointwiseTable::new(nu.energies, nu.values));
             }
         }
     }
@@ -154,10 +153,7 @@ pub fn load_nuclide_from_hdf5(
                     .map(convert_angular);
                 nuclide.discrete_level_angles.push(level_angle);
             }
-            nuclide.has_continuum_inelastic = nuclide
-                .discrete_levels
-                .iter()
-                .any(|l| l.mt == 91);
+            nuclide.has_continuum_inelastic = nuclide.discrete_levels.iter().any(|l| l.mt == 91);
         }
     }
     Ok(nuclide)

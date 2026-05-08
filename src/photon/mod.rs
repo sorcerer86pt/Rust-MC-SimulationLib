@@ -33,8 +33,8 @@ pub mod transport;
 
 pub use data::PhotonElement;
 pub use interactions::{
-    M_E_C2_EV, PAIR_THRESHOLD_EV, PhotonOutcome, PhotonReaction, sample_compton_free,
-    sample_pair, sample_photoelectric,
+    M_E_C2_EV, PAIR_THRESHOLD_EV, PhotonOutcome, PhotonReaction, sample_compton_free, sample_pair,
+    sample_photoelectric,
 };
 pub use material::PhotonMaterial;
 pub use source::{IsotropicLineSource, MonoBoxSource, PhotonSource, SourcePhoton};

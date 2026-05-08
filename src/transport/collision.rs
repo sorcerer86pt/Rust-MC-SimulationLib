@@ -23,9 +23,7 @@ pub enum CollisionOutcome {
     Fission { sites: Vec<FissionSite> },
     /// (n, 2n) / (n, 3n): primary continues, secondaries banked
     /// for the *current* generation (not the fission bank).
-    Multiplicity {
-        secondaries: Vec<SecondaryNeutron>,
-    },
+    Multiplicity { secondaries: Vec<SecondaryNeutron> },
 }
 
 /// A non-fission secondary neutron emitted in (n, 2n) / (n, 3n).
@@ -64,12 +62,7 @@ pub fn sample_nuclide_at_energy(
         return None;
     }
     let xi = rng.uniform() * total;
-    for (i, ((_, density), xs)) in material
-        .nuclides
-        .iter()
-        .zip(nuclide_xs.iter())
-        .enumerate()
-    {
+    for (i, ((_, density), xs)) in material.nuclides.iter().zip(nuclide_xs.iter()).enumerate() {
         cum_total += density * xs.total;
         if xi < cum_total {
             return Some((i, *xs));
@@ -97,8 +90,7 @@ pub fn process_collision(
         // Bound-atom thermal kernel takes over below energy_max.
         if let Some(thermal) = &nuclide.thermal_scattering {
             if particle.energy <= thermal.energy_max() {
-                let (e_out, mu_lab) =
-                    thermal.sample(particle.energy, temperature_k, rng);
+                let (e_out, mu_lab) = thermal.sample(particle.energy, temperature_k, rng);
                 particle.dir = rotate_direction(particle.dir, mu_lab, rng);
                 particle.energy = e_out.max(1e-5);
                 return CollisionOutcome::Scatter;
@@ -123,19 +115,19 @@ pub fn process_collision(
         // cross section. Continuum MT=91 (when present) is one of
         // the entries; we sample its outgoing energy from the
         // continuum-tabulated distribution.
-        let (q_value, level_idx) =
-            sample_inelastic_level(particle.energy, xs.awr, nuclide, rng);
+        let (q_value, level_idx) = sample_inelastic_level(particle.energy, xs.awr, nuclide, rng);
         let angle = level_idx.and_then(|i| {
             nuclide
                 .discrete_level_angles
                 .get(i)
                 .and_then(|o| o.as_ref())
         });
-        let (e, d) =
-            inelastic_scatter(particle.energy, particle.dir, xs.awr, q_value, angle, rng);
+        let (e, d) = inelastic_scatter(particle.energy, particle.dir, xs.awr, q_value, angle, rng);
         particle.energy = e;
         particle.dir = d;
-        return CollisionOutcome::InelasticScatter { q_value_ev: q_value };
+        return CollisionOutcome::InelasticScatter {
+            q_value_ev: q_value,
+        };
     }
 
     cum += xs.n2n;
@@ -195,7 +187,11 @@ fn sample_inelastic_level(
             return (level.q_value, Some(idx));
         }
     }
-    let (last_idx, _) = *accessible.last().unwrap();
+    // Safe: `accessible` is non-empty (the `is_empty()` early
+    // return above guarantees that), so `last()` is `Some(_)`.
+    let Some(&(last_idx, _)) = accessible.last() else {
+        return (-45_000.0, None);
+    };
     (nuclide.discrete_levels[last_idx].q_value, Some(last_idx))
 }
 
@@ -283,11 +279,7 @@ pub fn collide_in_material(
 /// Bring `elastic_scatter` into scope so down-stream callers that
 /// want a "no anisotropy, no thermal" path can call it directly via
 /// `transport::collision::elastic_scatter_simple`.
-pub fn elastic_scatter_simple(
-    particle: &mut Particle,
-    awr: f64,
-    rng: &mut Pcg64,
-) {
+pub fn elastic_scatter_simple(particle: &mut Particle, awr: f64, rng: &mut Pcg64) {
     let (e, d) = elastic_scatter(particle.energy, particle.dir, awr, rng);
     particle.energy = e;
     particle.dir = d;

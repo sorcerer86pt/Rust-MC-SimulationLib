@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Stress example for at-scale workloads.
 //!
 //! Builds N independent SvdKernels from synthetic data, both

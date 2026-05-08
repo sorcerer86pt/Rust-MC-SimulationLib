@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! CP/PARAFAC decomposition of a synthetic 3-tensor with mixed structure.
 //!
 //! Reports per-rank reconstruction error and memory cost so callers

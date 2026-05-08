@@ -28,9 +28,21 @@ pub fn ascii_glyph_for_name(name: &str) -> char {
         return 'M';
     }
     let is_fuel = any(&[
-        "uo2", "uo₂", "uranium", "fuel", "first cycle", "1st cycle",
-        "second cycle", "2nd cycle", "third cycle", "3rd cycle",
-        "boc", "eoc", "fresh", "mid-core", "mid core",
+        "uo2",
+        "uo₂",
+        "uranium",
+        "fuel",
+        "first cycle",
+        "1st cycle",
+        "second cycle",
+        "2nd cycle",
+        "third cycle",
+        "3rd cycle",
+        "boc",
+        "eoc",
+        "fresh",
+        "mid-core",
+        "mid core",
     ]);
     if is_fuel {
         if any(&["burnt", "depleted", "spent", "third", "3rd cycle", "eoc"]) {
@@ -44,9 +56,7 @@ pub fn ascii_glyph_for_name(name: &str) -> char {
     if any(&["zircaloy", "clad", "zr "]) || n == "zr" {
         return '+';
     }
-    if any(&["steel", "vessel", "barrel", "iron"])
-        || n.split_whitespace().any(|w| w == "ss")
-    {
+    if any(&["steel", "vessel", "barrel", "iron"]) || n.split_whitespace().any(|w| w == "ss") {
         return '=';
     }
     if n.contains("concrete") {
@@ -91,7 +101,10 @@ pub fn render_ascii<M: NamedMaterial>(
     viewport: &Viewport,
 ) -> String {
     let glyphs: Vec<char> = glyphs.unwrap_or_else(|| {
-        materials.iter().map(|m| ascii_glyph_for_name(m.name())).collect()
+        materials
+            .iter()
+            .map(|m| ascii_glyph_for_name(m.name()))
+            .collect()
     });
     let bvh = Bvh::build(cells);
     let dx = (viewport.x_max - viewport.x_min) / viewport.width as f64;
@@ -202,10 +215,7 @@ pub fn print_ascii_with<M: NamedMaterial>(
     for (m, g) in materials.iter().zip(glyphs.iter()) {
         if colour {
             if let Some([r, gn, b]) = auto_color_from_name(m.name()) {
-                println!(
-                    "  \x1b[48;2;{r};{gn};{b}m {g} \x1b[0m  {}",
-                    m.name()
-                );
+                println!("  \x1b[48;2;{r};{gn};{b}m {g} \x1b[0m  {}", m.name());
                 continue;
             }
         }

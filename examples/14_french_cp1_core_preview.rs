@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! French CP1-class PWR whole-core preview — 900 MWe Westinghouse
 //! 3-loop design (Almaraz / Ascó / Tricastin / Bugey / Blayais /
 //! Cruas …). 161 fuel assemblies arranged on a 21.5 cm pitch in the
@@ -19,9 +20,9 @@
 //! cargo run --release --features preview --example 14_french_cp1_core_preview
 //! ```
 
+use rust_mc_sim::geometry::Surface;
 use rust_mc_sim::geometry::cell::{Cell, CellFill, CellId, between, inside};
 use rust_mc_sim::geometry::surface::BoundaryCondition;
-use rust_mc_sim::geometry::Surface;
 use rust_mc_sim::preview::{Viewport, preview_geometry};
 use rust_mc_sim::transport::material::Material;
 
@@ -39,11 +40,27 @@ const RADIUS_BATCH_2: f64 = 120.0;
 
 // Representative subset of the 53 RCCA cluster positions.
 const CONTROL_POSITIONS: &[(i32, i32)] = &[
-    (0, 0), (0, 4), (0, -4), (4, 0), (-4, 0),
-    (4, 4), (4, -4), (-4, 4), (-4, -4),
-    (0, 7), (0, -7), (7, 0), (-7, 0),
-    (3, 6), (3, -6), (-3, 6), (-3, -6),
-    (6, 3), (6, -3), (-6, 3), (-6, -3),
+    (0, 0),
+    (0, 4),
+    (0, -4),
+    (4, 0),
+    (-4, 0),
+    (4, 4),
+    (4, -4),
+    (-4, 4),
+    (-4, -4),
+    (0, 7),
+    (0, -7),
+    (7, 0),
+    (-7, 0),
+    (3, 6),
+    (3, -6),
+    (-3, 6),
+    (-3, -6),
+    (6, 3),
+    (6, -3),
+    (-6, 3),
+    (-6, -3),
 ];
 
 // Material indices into the materials list below.
@@ -159,9 +176,7 @@ fn main() {
         cells.len(),
         materials.len()
     );
-    println!(
-        "drag/scroll to zoom, R to reset, L for legend, Esc to close."
-    );
+    println!("drag/scroll to zoom, R to reset, L for legend, Esc to close.");
     preview_geometry(
         viewport,
         "rust-mc-sim — French CP1 900 MWe core preview",

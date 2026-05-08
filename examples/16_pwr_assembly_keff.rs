@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! 17 × 17 PWR fuel assembly k_∞ benchmark — full ENDF/B-VII.1
 //! physics on a Westinghouse / CP1 assembly footprint with 24
 //! water-filled guide-tube positions and 1 central instrumentation
@@ -24,14 +25,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
-use rust_mc_sim::geometry::cell::{
-    Cell, CellFill, CellId, Region, between, inside, outside,
-};
-use rust_mc_sim::geometry::surface::BoundaryCondition;
 use rust_mc_sim::geometry::Surface;
+use rust_mc_sim::geometry::cell::{Cell, CellFill, CellId, Region, between, inside, outside};
+use rust_mc_sim::geometry::surface::BoundaryCondition;
 use rust_mc_sim::nuclear::loader::{
-    LoaderConfig, attach_thermal_scattering, load_nuclide_from_hdf5,
-    load_thermal_scattering,
+    LoaderConfig, attach_thermal_scattering, load_nuclide_from_hdf5, load_thermal_scattering,
 };
 use rust_mc_sim::transport::material::{Material, Nuclide};
 use rust_mc_sim::transport::simulate::{EigenvalueConfig, run_eigenvalue};
@@ -61,13 +59,31 @@ const N_O16_MOD: f64 = 2.418e-2;
 // row/col converted to 0-indexed). 24 guide tubes + central
 // instrumentation thimble = 25 non-fuel positions.
 const NON_FUEL_POSITIONS: &[(i32, i32)] = &[
-    (2, 5), (2, 8), (2, 11),
-    (3, 3), (3, 13),
-    (5, 2), (5, 5), (5, 8), (5, 11), (5, 14),
-    (8, 2), (8, 5), (8, 8), (8, 11), (8, 14),
-    (11, 2), (11, 5), (11, 8), (11, 11), (11, 14),
-    (13, 3), (13, 13),
-    (14, 5), (14, 8), (14, 11),
+    (2, 5),
+    (2, 8),
+    (2, 11),
+    (3, 3),
+    (3, 13),
+    (5, 2),
+    (5, 5),
+    (5, 8),
+    (5, 11),
+    (5, 14),
+    (8, 2),
+    (8, 5),
+    (8, 8),
+    (8, 11),
+    (8, 14),
+    (11, 2),
+    (11, 5),
+    (11, 8),
+    (11, 11),
+    (11, 14),
+    (13, 3),
+    (13, 13),
+    (14, 5),
+    (14, 8),
+    (14, 11),
 ];
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -209,14 +225,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Moderator = inside the assembly box ∩ outside every clad.
-    let inside_box = Region::Intersection(
-        Box::new(between(s_xn, s_xp)),
-        Box::new(between(s_yn, s_yp)),
-    );
+    let inside_box =
+        Region::Intersection(Box::new(between(s_xn, s_xp)), Box::new(between(s_yn, s_yp)));
     let mut mod_region = inside_box;
     for &c in &clad_surfaces {
-        mod_region =
-            Region::Intersection(Box::new(mod_region), Box::new(outside(c)));
+        mod_region = Region::Intersection(Box::new(mod_region), Box::new(outside(c)));
     }
     cells.push(
         Cell::new(
@@ -241,9 +254,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(feature = "preview")]
     {
         use rust_mc_sim::preview::{Viewport, preview_geometry};
-        println!(
-            "\nopening preview window… close (Esc / X) to start the simulation."
-        );
+        println!("\nopening preview window… close (Esc / X) to start the simulation.");
         preview_geometry(
             Viewport::square_centered(HALF_ASSEMBLY * 1.15, 0.0, 800),
             "rust-mc-sim — 17×17 PWR assembly preview",
@@ -288,14 +299,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|_| u64::from(cfg.n_particles_per_batch))
         .sum();
     let ns_per_history = (sim_s * 1.0e9) / (n_active_hist.max(1) as f64);
-    let total_collisions: u64 = result
-        .batch_history
-        .iter()
-        .map(|b| b.n_collisions)
-        .sum();
+    let total_collisions: u64 = result.batch_history.iter().map(|b| b.n_collisions).sum();
     let collisions_per_history = total_collisions as f64
-        / (u64::from(cfg.n_batches) * u64::from(cfg.n_particles_per_batch))
-            as f64;
+        / (u64::from(cfg.n_batches) * u64::from(cfg.n_particles_per_batch)) as f64;
 
     println!(
         "\n  k_∞ (active batches) = {:.5} ± {:.5}",

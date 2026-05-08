@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! URR probability-table sampling.
 //!
 //! Run with: `cargo run --release --example 08_urr_sampling`
